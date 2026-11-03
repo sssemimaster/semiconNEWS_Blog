@@ -6,7 +6,6 @@ baseurl: '/semiconNEWS_Blog'
 lang: ko-KR
 timezone: Asia/Seoul
 
-# Import the theme
 theme: jekyll-theme-chirpy
 
 description: >-
@@ -15,89 +14,12 @@ description: >-
 github:
   username: sssemimaster
 
-twitter:
-  username: 
-
 social:
   name: sssemimaster
-  email: 
   links:
     - https://github.com/sssemimaster
 
-# Site Verification Settings
-webmaster_verifications:
-  google: 
-  bing: 
-  alexa: 
-  yandex: 
-  baidu: 
-  facebook: 
-
-# Web Analytics Settings
-analytics:
-  google:
-    id: 
-  goatcounter:
-    id: 
-  umami:
-    id: 
-    domain: 
-  matomo:
-    id: 
-    domain: 
-  cloudflare:
-    id: 
-  fathom:
-    id: 
-
-pageviews:
-  provider: 
-
-theme_mode: 
-
-cdn:
-avatar:
-social_preview_image:
-toc: true
-
-actions:
-  edit_post:
-    enabled: false
-    url: ""
-    static_url: false
-
-comments:
-  provider: 
-  disqus:
-    shortname: 
-  utterances:
-    repo: 
-    issue_term: 
-  giscus:
-    repo: 
-    repo_id:
-    category:
-    category_id:
-    mapping: 
-    strict: 
-    input_position: 
-    lang: 
-    reactions_enabled: 
-
-assets:
-  self_host:
-    enabled: 
-    env: 
-
-pwa:
-  enabled: true
-  cache:
-    enabled: true
-    deny_paths:
-
 paginate: 10
-
-# ------------ The following options are not recommended to be modified ------------------
 
 kramdown:
   footnote_backlink: "&#8617;&#xfe0e;"
