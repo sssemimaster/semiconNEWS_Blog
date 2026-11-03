@@ -15,11 +15,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: 저장소 코드 불러오기
+    - name: 저장소 코드 가져오기
       uses: actions/checkout@v4
-
+      with:
+        token: ${{ secrets.GH_PAT }}  # 💡 이 두 줄을 반드시 추가해야 합니다!
+        
     - name: 파이썬 환경 설정
       uses: actions/setup-python@v5
+# ... 이하 기존 코드 동일 ...
+
       with:
         python-version: '3.10'
 
@@ -42,3 +46,4 @@ jobs:
         # 변경된 사항이 있을 때만 커밋 (에러 방지)
         git commit -m "📝 Auto-post: 오늘의 반도체 뉴스 블로그 업로드" || echo "No changes to commit"
         git push
+
