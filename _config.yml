@@ -235,3 +235,14 @@ jekyll-archives:
   permalinks:
     tag: /tags/:name/
     category: /categories/:name/
+
+title: 반도체 인사이트 리포트
+tagline: 매일 아침 업데이트되는 글로벌 반도체 & AI 기술 동향
+url: 'https://<sssemimaster>.github.io' # 옵션 B 선택 시 'https://<내 아이디>.github.io/semiconNEWS_Blog'
+
+author:
+  name: 본인이름 또는 블로그닉네임
+  twitter: 
+
+timezone: Asia/Seoul
+lang: ko-KR
