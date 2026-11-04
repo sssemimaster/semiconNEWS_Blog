@@ -1,4 +1,4 @@
-name: Daily Semiconductor News Scraping
+name: Daily Semiconductor Process News Scraping
 
 on:
   schedule:
@@ -36,5 +36,5 @@ jobs:
         git config --global user.name 'github-actions[bot]'
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
         git add _posts/
-        git commit -m "docs: 🤖 오늘자 반도체 뉴스 블로그 포스팅 자동 추가" || echo "No changes to commit"
+        git commit -m "docs: 🧪 화공학도의 시선으로 본 오늘의 공정 기술 분석 자동 포스팅" || echo "No changes to commit"
         git push origin main
