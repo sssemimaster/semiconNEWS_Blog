@@ -14,7 +14,8 @@ RSS_FEEDS = {
 
 HEADERS = {'User-Agent': 'Mozilla/5.0'}
 
-TECH_IMAGES = [
+# 썸네일(헤더)용 이미지만 남김
+HEADER_IMAGES = [
     "https://images.unsplash.com/photo-1611078518653-568853b0bcce?auto=format&fit=crop&w=1200&h=675&q=80",
     "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&h=675&q=80",
     "https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1200&h=675&q=80",
@@ -23,7 +24,7 @@ TECH_IMAGES = [
 
 def collect_news():
     articles = []
-    print("[1/4] 뉴스 수집 중...")
+    print("[1/3] 뉴스 수집 중...")
     for source, url in RSS_FEEDS.items():
         try:
             res = requests.get(url, headers=HEADERS, timeout=5)
@@ -36,7 +37,7 @@ def collect_news():
     return articles
 
 def generate_blog_content(articles):
-    print("[2/4] 순수 텍스트 기반 롱폼 본문 생성 중...")
+    print("[2/3] 다이어그램 및 시각화 포함 롱폼 본문 생성 중...")
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY 누락")
@@ -44,19 +45,25 @@ def generate_blog_content(articles):
     client = OpenAI(api_key=api_key)
     raw_text = "\n".join(articles[:20])
     
-    # 💡 JSON 에러를 피하기 위해 순수 텍스트 포맷으로 지시
     system_prompt = """
-    당신은 화학공학 전공 반도체 엔지니어입니다. 화학 반응식과 공정 원리가 포함된 아주 전문적이고 상세한 롱폼 아티클(최소 2500자)을 작성하세요.
-    수식은 반드시 $$ 기호로 감싸고, \mathrm{} 과 \to 를 사용하세요. (예: $$ \mathrm{SiH}_4 \to \mathrm{Si} + 2\mathrm{H}_2 $$)
-    절대 본문에 이미지를 임의로 삽입하지 마세요.
+    당신은 화학공학 전공 반도체 공정 엔지니어입니다.
+    
+    [시각화 및 가독성 극대화 규칙]
+    1. 사진(이미지) 삽입은 절대 금지합니다.
+    2. 글의 가독성을 높이기 위해 본문 중간에 반드시 아래의 시각화 기법을 적극 활용하세요.
+       - Mermaid 다이어그램: 공정 순서, 화학 반응 메커니즘 등을 `mermaid` 코드 블록으로 그리세요. (예: graph TD; A-->B;)
+       - 마크다운 표(Table): 소재 특성 비교, 장단점 등을 표로 깔끔하게 정리하세요.
+       - 인용구(Blockquote): 핵심 요약이나 인사이트는 `>` 를 활용해 눈에 띄게 강조하세요.
+    3. 수식은 LaTeX(백슬래시)를 절대 쓰지 말고, HTML 태그(<sub>, <sup>, &rarr;, &Delta;)만 사용하세요. (예: SiH<sub>4</sub> &rarr; Si + 2H<sub>2</sub>)
+    4. 글은 학부생과 주니어 엔지니어가 딥다이브할 수 있도록 아주 길고 상세하게(최소 3000자 이상) 작성하세요.
     """
 
     user_prompt = f"""
-    반드시 아래의 양식으로만 출력하세요. (JSON 포맷 절대 금지)
+    반드시 아래 양식의 순수 텍스트로만 출력하세요. (JSON 포맷 절대 금지)
     
     Title: [포스팅 제목]
     Content:
-    [서론, 본론(H2 활용), 용어정리, 결론으로 구성된 마크다운 본문]
+    [서론, 본론(다이어그램/표 포함), 결론으로 구성된 마크다운 본문]
 
     수집된 기사:
     {raw_text}
@@ -70,39 +77,17 @@ def generate_blog_content(articles):
     
     full_text = response.choices[0].message.content
     
-    # 순수 텍스트에서 제목과 본문 분리 추출
     try:
         title = re.search(r'Title:\s*(.*)', full_text, re.IGNORECASE).group(1).strip()
         content = re.search(r'Content:\s*(.*)', full_text, re.IGNORECASE | re.DOTALL).group(1).strip()
     except AttributeError:
-        title = f"{datetime.datetime.now().strftime('%Y년 %m월 %d일')} 반도체 공정 주요 동향"
+        title = f"{datetime.datetime.now().strftime('%Y년 %m월 %d일')} 반도체 공정 기술 동향"
         content = full_text
         
     return title, content
 
-def inject_html_images(content, image_list):
-    """💡 마크다운 이미지 오류를 피하기 위해 완벽한 HTML 태그로 이미지를 주입"""
-    lines = content.split('\n')
-    new_lines = []
-    img_count = 0
-    for line in lines:
-        new_lines.append(line)
-        # H2(##) 태그 아래에 HTML 이미지 삽입
-        if line.startswith('## ') and img_count < 2:
-            img = random.choice(image_list)
-            html_img = f'\n<img src="{img}" alt="반도체 공정 이미지" style="width:100%; border-radius:12px; margin: 20px 0;">\n'
-            new_lines.append(html_img)
-            img_count += 1
-    return '\n'.join(new_lines)
-
 def save_to_markdown(title, content):
-    print("[3/4] 수식 보호 및 HTML 이미지 주입 중...")
-    
-    # 💡 깃허브 블로그가 수식 기호(\)를 지워버리는 것을 막기 위해 모든 백슬래시를 두 배로 늘림
-    content = content.replace('\\', '\\\\')
-    
-    # 이미지 안전 주입
-    content = inject_html_images(content, TECH_IMAGES)
+    print("[3/3] 마크다운 파일 생성 중...")
     
     now = datetime.datetime.now()
     date_str = now.strftime("%Y-%m-%d")
@@ -111,13 +96,13 @@ def save_to_markdown(title, content):
     if len(filename) > 100:
         filename = f"_posts/{date_str}-daily-process-news.md"
     
-    header_image = random.choice(TECH_IMAGES)
+    header_image = random.choice(HEADER_IMAGES)
     
     front_matter = f"""---
 title: "{title}"
 date: {now.strftime("%Y-%m-%d %H:%M:%S +0900")}
 categories: [반도체 공정, 기술분석]
-tags: [화학공학, 8대공정, 공정엔지니어]
+tags: [화학공학, 8대공정, 공정엔지니어, 반도체뉴스]
 image:
   path: "{header_image}"
 math: true
@@ -129,7 +114,7 @@ mermaid: true
     with open(filename, "w", encoding="utf-8") as f:
         f.write(front_matter + content)
     
-    print(f"✅ 에러 없는 최종 파일 생성 완료: {filename}")
+    print(f"✅ 파일 생성 완료: {filename}")
 
 def main():
     print("=== 뉴스 브리핑 스크립트 시작 ===")
@@ -137,7 +122,7 @@ def main():
     if not articles: return
     title, content = generate_blog_content(articles)
     save_to_markdown(title, content)
-    print("[4/4] 로컬 파일 쓰기 완료.")
+    print("=== 자동화 완료 ===")
 
 if __name__ == "__main__":
     main()
