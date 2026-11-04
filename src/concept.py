@@ -43,8 +43,8 @@ def generate_concept_wiki(previous_topics):
     당신은 화학공학 전공 반도체 엔지니어이자 테크 위키 작성자입니다.
     이전 주제 목록을 분석하여 중복되지 않는 다음 단계의 심화 공정 개념 1가지를 선정하고, 최소 2500자 이상의 문서를 작성하세요.
 
-    [작성 가이드]
-    1. 화학 반응식이나 수식을 작성할 때는 무조건 `$$` 기호로 감싸세요.
+    [화학 반응식 수식 규칙]
+    수식을 작성할 때는 무조건 `$$` 기호로 감싸세요. (예: `$$ \mathrm{SiH}_4 \to \mathrm{Si} + 2\mathrm{H}_2 $$`)
     """
 
     user_prompt = f"""
@@ -52,9 +52,7 @@ def generate_concept_wiki(previous_topics):
     {prev_topics_str}
 
     [이미지 자동 삽입 가이드]
-    본문 설명 중간중간 아래 제공된 마크다운 코드를 1글자도 바꾸지 말고 그대로 복사해서 삽입하세요. (절대 URL 앞뒤에 따옴표를 넣지 마세요!)
-    
-    사용 가능한 마크다운 이미지 코드:
+    본문 설명 중간중간 아래 제공된 마크다운 코드를 복사해서 삽입하세요.
     {image_pool_str}
 
     위 목록을 참고하여 오늘 작성할 1개의 핵심 개념을 스스로 정하고, JSON 형식으로 응답하세요.
@@ -67,7 +65,7 @@ def generate_concept_wiki(previous_topics):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
-        temperature=0.6,
+        temperature=0.5,
         response_format={"type": "json_object"}
     )
     
@@ -77,16 +75,9 @@ def generate_concept_wiki(previous_topics):
 def save_to_markdown(title, content):
     print("[2/3] 백과사전 텍스트 교정 및 마크다운 파일 생성 중...")
     
-    # 💡 수식 및 이미지 에러 강제 교정 (main.py와 동일)
-    content = content.replace('\\[', '$$').replace('\\]', '$$')
-    content = content.replace('\[', '$$').replace('\]', '$$')
-    
-    latex_commands = ['text', 'mathrm', 'rightarrow', 'to', 'leftarrow', 'uparrow', 'downarrow', 'Delta', 'mu', 'alpha', 'beta', 'gamma']
-    for cmd in latex_commands:
-        content = content.replace(f'\\{cmd}', f'\\\\{cmd}')
-        
-    content = content.replace(r'\\text', r'\\mathrm')
-    content = content.replace('("https://images', '(https://images').replace('80")', '80)')
+    # 💡 1. 깃허브 블로그 수식 에러 원천 차단
+    content = content.replace('\\', '\\\\')
+    content = content.replace('\\\\\\[', '$$').replace('\\\\\\]', '$$')
 
     now = datetime.datetime.now()
     date_str = now.strftime("%Y-%m-%d")
@@ -97,6 +88,16 @@ def save_to_markdown(title, content):
     
     header_image = random.choice(WIKI_IMAGES)
     
+    # 💡 2. 이미지 짤림 방지 CSS 추가
+    css_injection = """
+<style>
+  .post-content img, .preview-img img, .post-header img {
+    object-fit: contain !important;
+    background-color: transparent !important;
+  }
+</style>
+"""
+
     front_matter = f"""---
 title: "{title}"
 date: {now.strftime("%Y-%m-%d %H:%M:%S +0900")}
@@ -107,7 +108,7 @@ image:
 math: true
 mermaid: true
 ---
-
+{css_injection}
 """
     os.makedirs("_posts", exist_ok=True)
     with open(filename, "w", encoding="utf-8") as f:
