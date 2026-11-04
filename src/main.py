@@ -51,22 +51,26 @@ def generate_blog_content(articles):
     client = OpenAI(api_key=api_key)
     raw_text = "\n".join(articles[:30])
     today_str = datetime.datetime.now().strftime("%Y년 %m월 %d일")
-    image_pool_str = "\n".join([f"- {img}" for img in TECH_IMAGES])
+    
+    # AI가 헷갈리지 않게 아예 완성된 마크다운 코드를 제공
+    image_md_list = [f"- ![참고 자료]({img})" for img in TECH_IMAGES]
+    image_pool_str = "\n".join(image_md_list)
     
     system_prompt = """
     당신은 화학공학 전공 4년차 학부생이자 예비 반도체 엔지니어입니다.
     제공된 뉴스를 바탕으로 화학공학 지식(반응식, 열역학)이 포함된 롱폼(최소 2500자) 마크다운 아티클을 작성하세요.
 
     [작성 가이드]
-    1. 수식을 작성할 때는 무조건 `$$` 기호로 감싸세요. (예: `$$ \mathrm{SiH}_4 \to \mathrm{Si} + 2\mathrm{H}_2 $$`)
-    2. 블로그 에러를 막기 위해 화학 물질명은 `\text{}` 대신 `\mathrm{}`을 사용하세요.
+    1. 화학 반응식이나 수식을 작성할 때는 무조건 `$$` 기호로 감싸세요. (예: `$$ \mathrm{SiH}_4 \to \mathrm{Si} + 2\mathrm{H}_2 $$`)
     """
 
     user_prompt = f"""
     반드시 JSON 형식으로 응답하세요. 키는 "title"과 "content" 입니다.
 
     [이미지 자동 삽입 가이드]
-    본문 H2 섹션 아래 2~3곳에 다음 URL을 정확히 복사하여 마크다운 이미지(`![설명](URL)`)로 삽입하세요.
+    본문 H2 섹션 아래 2~3곳에 아래 제공된 마크다운 코드를 1글자도 바꾸지 말고 그대로 복사해서 삽입하세요. (절대 URL 앞뒤에 따옴표를 넣지 마세요!)
+    
+    사용 가능한 마크다운 이미지 코드:
     {image_pool_str}
 
     [마크다운 콘텐츠 필수 구조]
@@ -93,13 +97,24 @@ def generate_blog_content(articles):
     return post_data['title'], post_data['content']
 
 def save_to_markdown(title, content):
-    print("[3/4] 마크다운 파일 생성 및 호환성 교정 중...")
+    print("[3/4] 텍스트 교정 및 마크다운 파일 생성 중...")
     
-    # 💡 [핵심 안전장치] AI가 잘못 생성한 수식 기호를 블로그 호환(MathJax) 기호로 강제 치환
+    # 💡 1. 괄호 수식을 블로그 호환형 $$ 수식으로 강제 변경
     content = content.replace('\\[', '$$').replace('\\]', '$$')
     content = content.replace('\[', '$$').replace('\]', '$$')
-    content = content.replace('\\text{', '\\mathrm{')
     
+    # 💡 2. Kramdown 파서가 백슬래시를 먹어치우는 현상(ext 에러) 원천 차단
+    # 자주 쓰이는 기호들의 백슬래시를 강제로 2개로 늘림
+    latex_commands = ['text', 'mathrm', 'rightarrow', 'to', 'leftarrow', 'uparrow', 'downarrow', 'Delta', 'mu', 'alpha', 'beta', 'gamma']
+    for cmd in latex_commands:
+        content = content.replace(f'\\{cmd}', f'\\\\{cmd}')
+        
+    # 💡 3. \text 폰트 깨짐 방지를 위해 \mathrm으로 일괄 변경
+    content = content.replace(r'\\text', r'\\mathrm')
+    
+    # 💡 4. AI가 괄호 안에 따옴표를 넣은 엑스박스 이미지 강제 교정
+    content = content.replace('("https://images', '(https://images').replace('80")', '80)')
+
     now = datetime.datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     safe_title = re.sub(r'[^가-힣A-Za-z0-9\s]', '', title).strip().replace(' ', '-')
