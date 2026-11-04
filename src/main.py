@@ -7,28 +7,29 @@ import feedparser
 import requests
 from openai import OpenAI
 
+# 1. 수집할 구글 뉴스 RSS 목록 (공정, 소재, 장비 중심으로 전면 개편)
 RSS_FEEDS = {
-    '구글뉴스(반도체)': 'https://news.google.com/rss/search?q=반도체+when:1d&hl=ko&gl=KR&ceid=KR:ko',
-    '구글뉴스(삼성전자)': 'https://news.google.com/rss/search?q=삼성전자+반도체+when:1d&hl=ko&gl=KR&ceid=KR:ko',
-    '구글뉴스(SK하이닉스)': 'https://news.google.com/rss/search?q=SK하이닉스+반도체+when:1d&hl=ko&gl=KR&ceid=KR:ko',
-    '구글뉴스(TSMC)': 'https://news.google.com/rss/search?q=TSMC+반도체+when:1d&hl=ko&gl=KR&ceid=KR:ko',
-    '구글뉴스(엔비디아)': 'https://news.google.com/rss/search?q=엔비디아+반도체+when:1d&hl=ko&gl=KR&ceid=KR:ko'
+    '공정기술/수율': 'https://news.google.com/rss/search?q=반도체+공정+OR+수율+when:1d&hl=ko&gl=KR&ceid=KR:ko',
+    '반도체소재/화학': 'https://news.google.com/rss/search?q=반도체+소재+OR+포토레지스트+OR+특스가스+when:1d&hl=ko&gl=KR&ceid=KR:ko',
+    'EUV/노광/식각': 'https://news.google.com/rss/search?q=EUV+OR+노광+OR+식각+when:1d&hl=ko&gl=KR&ceid=KR:ko',
+    '첨단패키징/HBM': 'https://news.google.com/rss/search?q=반도체+패키징+OR+HBM+OR+TSV+when:1d&hl=ko&gl=KR&ceid=KR:ko',
+    '증착/세정/검사': 'https://news.google.com/rss/search?q=반도체+증착+OR+세정+OR+장비+when:1d&hl=ko&gl=KR&ceid=KR:ko'
 }
 
 HEADERS = {'User-Agent': 'Mozilla/5.0'}
 
+# 2. 반도체 웨이퍼, 팹(Fab), 화학 공정 느낌의 고화질 이미지
 TECH_IMAGES = [
+    "https://images.unsplash.com/photo-1611078518653-568853b0bcce?auto=format&fit=crop&w=1200&q=80",
     "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1611078518653-568853b0bcce?auto=format&fit=crop&w=1200&q=80"
+    "https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1200&q=80", # 랩/연구실 느낌
+    "https://images.unsplash.com/photo-1581092335397-9583eb92d232?auto=format&fit=crop&w=1200&q=80", # 엔지니어/소재
+    "https://images.unsplash.com/photo-1563770660941-20978e870e26?auto=format&fit=crop&w=1200&q=80"
 ]
 
 def collect_news():
     articles = []
-    print("[1/4] 구글 뉴스 RSS 피드 수집 중...")
+    print("[1/4] 반도체 공정 및 소재 중심 RSS 피드 수집 중...")
     for source, url in RSS_FEEDS.items():
         try:
             res = requests.get(url, headers=HEADERS, timeout=5)
@@ -43,7 +44,7 @@ def collect_news():
     return articles
 
 def generate_blog_content(articles):
-    print("[2/4] OpenAI (gpt-4o-mini)로 상세 블로그 본문 생성 중...")
+    print("[2/4] OpenAI로 화공학도 관점의 공정 분석 본문 생성 중...")
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.")
@@ -52,27 +53,27 @@ def generate_blog_content(articles):
     raw_text = "\n".join(articles[:30])
     today_str = datetime.datetime.now().strftime("%Y년 %m월 %d일")
     
+    # 💡 프롬프트 전면 수정: 화공학도 페르소나 및 8대 공정 기술 중심
     system_prompt = """
-    당신은 반도체 산업 전문 애널리스트이자 베스트셀러 IT 블로거입니다. 
-    제공된 뉴스 기사들을 깊이 있게 분석하여, 구글 검색(SEO)에 최적화된 매우 상세한 롱폼(Long-form) 마크다운 아티클을 작성하세요.
+    당신은 화학공학을 전공하며 반도체 공정 엔지니어를 꿈꾸는 열정적인 대학생 블로거입니다. 
+    단순한 주식 시황이나 실적 발표 뉴스는 철저히 배제하고, 화학공학(반응, 열역학, 유체, 재료공학) 및 반도체 8대 공정(노광, 식각, 증착, 패키징 등)의 관점에서 최신 기술 이슈를 분석하는 롱폼 마크다운 아티클을 작성하세요.
 
-    [가독성 및 분량 극대화 가이드]
-    1. 각 본론 섹션(H2 `##`)마다 최소 3~4개의 문단으로 나누어 아주 상세하게 풀어서 설명하세요. 짧게 요약하지 말고 배경지식까지 덧붙여서 길게 작성해야 합니다.
-    2. 독자가 읽기 편하도록 적절한 위치에 이모지(⚡, 📊, 🔍, 💡, 🚀)를 적극적으로 활용하세요.
-    3. 중요한 숫자(매출, 주가, 점유율 등), 기업명, 핵심 반도체 공정명은 반드시 **굵은 글씨** 처리하세요.
-    4. 주요 요약 섹션에는 인용구 blockquote(`>`)를 사용하세요.
-    5. 내용이 길어지더라도 끝까지 끊기지 않고 완전한 형태의 JSON으로 출력하세요.
+    [작성 가이드]
+    1. 각 본론 섹션(H2 `##`)은 특정 공정 기술이나 신소재 이슈를 다뤄야 합니다. 기술적 원리, 현재의 한계점, 극복 방안을 화공학도의 시선에서 최소 3~4문단으로 아주 상세하게 풀어서 설명하세요.
+    2. 중요한 화학 물질명, 공정 장비명, 물리/화학적 수치는 반드시 **굵은 글씨** 처리하세요.
+    3. 적절한 위치에 이모지(🧪, 🔬, ⚙️, ⚡, 칩)를 활용하여 딱딱한 기술 글의 가독성을 높이세요.
+    4. 내용이 길어지더라도 끝까지 끊기지 않고 완전한 형태의 JSON으로 출력하세요.
     """
 
     user_prompt = f"""
     반드시 JSON 형식으로만 응답하세요. 
-    키는 "title" (검색 유입이 잘 되도록 날짜 {today_str} 및 매력적인 키워드 포함)과 "content" (완벽한 마크다운) 두 개입니다.
+    키는 "title" (검색 유입이 잘 되도록 날짜 {today_str} 및 구체적인 공정/소재 키워드 포함)과 "content" (완벽한 마크다운) 두 개입니다.
 
     [마크다운 콘텐츠 필수 구조]
-    - 서론: 오늘 반도체 시장 흐름 및 증시 요약 (최소 5문장 이상 길게)
-    - 본론 1~4: 주요 섹터별(메모리, 파운드리, 소부장, AI 반도체 등) 상세 분석. 각 섹터별로 현재 상황, 원인, 전망을 깊이 있게 다룰 것. 관련 기사 원문 링크도 문맥에 맞게 연결하세요.
-    - 본론 5 (핵심 요약): 언급된 **관련 기업 및 필수 반도체 용어 정리** (마크다운 표 `|---|` 사용)
-    - 결론: 오늘의 산업적 시사점 및 개인 투자자를 위한 투자 인사이트 (아주 구체적으로 작성)
+    - 서론: 오늘 주목할 만한 반도체 공정/소재 분야의 흐름 요약 (blockquote `>` 활용, 학부생의 호기심 어린 톤 앤 매너)
+    - 본론 1~4: 기사에 언급된 핵심 공정(예: EUV 노광에서의 레지스트 반응, 식각 가스의 화학적 특성, TSV 패키징의 열 관리 등)에 대한 딥다이브 분석. 원문 링크를 문맥에 맞게 연결할 것.
+    - 본론 5 (오늘의 공정 단어장): 언급된 **주요 반도체 공정 용어 및 화학 물질 정리** (마크다운 표 `|---|` 사용)
+    - 결론: 화공학도의 시선 - 향후 반도체 미세화 및 수율 확보를 위해 공정 엔지니어가 나아가야 할 방향과 인사이트
 
     수집된 기사:
     {raw_text}
@@ -84,7 +85,7 @@ def generate_blog_content(articles):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
-        temperature=0.4, 
+        temperature=0.5, # 기술적 추론과 블로거다운 문장력을 위해 온도값 약간 상승
         response_format={"type": "json_object"}
     )
     
@@ -92,7 +93,7 @@ def generate_blog_content(articles):
     return post_data['title'], post_data['content']
 
 def save_to_markdown(title, content):
-    print("[3/4] Chirpy 테마 규격 마크다운 파일 생성 중...")
+    print("[3/4] 마크다운 파일 생성 중...")
     now = datetime.datetime.now()
     
     date_str = now.strftime("%Y-%m-%d")
@@ -100,15 +101,16 @@ def save_to_markdown(title, content):
     filename = f"_posts/{date_str}-{safe_title}.md"
     
     if len(filename) > 100:
-        filename = f"_posts/{date_str}-daily-semicon-news.md"
+        filename = f"_posts/{date_str}-daily-process-news.md"
     
     header_image = random.choice(TECH_IMAGES)
     
+    # 💡 카테고리와 태그를 공정 엔지니어링 맞춤형으로 변경
     front_matter = f"""---
 title: "{title}"
 date: {now.strftime("%Y-%m-%d %H:%M:%S +0900")}
-categories: [반도체, 일일브리핑]
-tags: [반도체, HBM, 파운드리, AI반도체, 테크]
+categories: [반도체 공정, 기술분석]
+tags: [화학공학, 8대공정, 반도체소재, 수율, 공정엔지니어]
 image:
   path: {header_image}
 math: true
@@ -123,7 +125,7 @@ mermaid: true
     print(f"✅ 파일 생성 완료: {filename}")
 
 def main():
-    print("=== GitHub Pages 블로그 자동화 시작 ===")
+    print("=== 화공학도의 반도체 공정 자동화 블로그 시작 ===")
     articles = collect_news()
     if not articles:
         print("수집된 뉴스가 없습니다.")
