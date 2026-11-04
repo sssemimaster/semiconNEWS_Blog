@@ -35,15 +35,16 @@ def generate_concept_wiki(previous_topics):
         
     client = OpenAI(api_key=api_key)
     prev_topics_str = "\n".join(previous_topics) if previous_topics else "기록 없음. '반도체 8대 공정 전체 개요'부터 시작하세요."
-    image_pool_str = "\n".join([f"- {img}" for img in WIKI_IMAGES])
+    
+    image_md_list = [f"- ![참고 자료]({img})" for img in WIKI_IMAGES]
+    image_pool_str = "\n".join(image_md_list)
     
     system_prompt = """
     당신은 화학공학 전공 반도체 엔지니어이자 테크 위키 작성자입니다.
     이전 주제 목록을 분석하여 중복되지 않는 다음 단계의 심화 공정 개념 1가지를 선정하고, 최소 2500자 이상의 문서를 작성하세요.
 
-    [화학 반응식 필수 작성 가이드]
-    1. 수식을 작성할 때는 무조건 `$$` 기호로 감싸세요. (예: `$$ \mathrm{SiH}_4 \to \mathrm{Si} + 2\mathrm{H}_2 $$`)
-    2. 블로그 에러를 막기 위해 화학 물질명은 `\text{}` 대신 `\mathrm{}`을 사용하세요.
+    [작성 가이드]
+    1. 화학 반응식이나 수식을 작성할 때는 무조건 `$$` 기호로 감싸세요.
     """
 
     user_prompt = f"""
@@ -51,7 +52,9 @@ def generate_concept_wiki(previous_topics):
     {prev_topics_str}
 
     [이미지 자동 삽입 가이드]
-    본문 설명 중간중간 아래 제공된 URL 중 1~2개를 골라 정확히 복사하여 `![이미지 설명](URL)` 마크다운 형식으로 삽입하세요.
+    본문 설명 중간중간 아래 제공된 마크다운 코드를 1글자도 바꾸지 말고 그대로 복사해서 삽입하세요. (절대 URL 앞뒤에 따옴표를 넣지 마세요!)
+    
+    사용 가능한 마크다운 이미지 코드:
     {image_pool_str}
 
     위 목록을 참고하여 오늘 작성할 1개의 핵심 개념을 스스로 정하고, JSON 형식으로 응답하세요.
@@ -72,13 +75,19 @@ def generate_concept_wiki(previous_topics):
     return post_data['title'], post_data['content']
 
 def save_to_markdown(title, content):
-    print("[2/3] 백과사전 마크다운 파일 생성 및 교정 중...")
+    print("[2/3] 백과사전 텍스트 교정 및 마크다운 파일 생성 중...")
     
-    # 💡 [핵심 안전장치] AI가 잘못 생성한 수식 기호를 블로그 호환(MathJax) 기호로 강제 치환
+    # 💡 수식 및 이미지 에러 강제 교정 (main.py와 동일)
     content = content.replace('\\[', '$$').replace('\\]', '$$')
     content = content.replace('\[', '$$').replace('\]', '$$')
-    content = content.replace('\\text{', '\\mathrm{')
     
+    latex_commands = ['text', 'mathrm', 'rightarrow', 'to', 'leftarrow', 'uparrow', 'downarrow', 'Delta', 'mu', 'alpha', 'beta', 'gamma']
+    for cmd in latex_commands:
+        content = content.replace(f'\\{cmd}', f'\\\\{cmd}')
+        
+    content = content.replace(r'\\text', r'\\mathrm')
+    content = content.replace('("https://images', '(https://images').replace('80")', '80)')
+
     now = datetime.datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     safe_title = re.sub(r'[^가-힣A-Za-z0-9\s]', '', title).strip().replace(' ', '-')
