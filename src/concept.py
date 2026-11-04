@@ -28,23 +28,22 @@ def get_previous_concepts():
     return concepts[-15:] 
 
 def generate_concept_wiki(previous_topics):
-    print("[1/3] OpenAI로 심층 반도체 기술 위키 생성 중...")
+    print("[1/3] OpenAI 위키 문서 생성 중...")
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        raise ValueError("OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.")
+        raise ValueError("OPENAI_API_KEY 환경 변수가 누락되었습니다.")
         
     client = OpenAI(api_key=api_key)
-    prev_topics_str = "\n".join(previous_topics) if previous_topics else "기록 없음. 가장 기초적인 '반도체 8대 공정 전체 개요'부터 시작하세요."
+    prev_topics_str = "\n".join(previous_topics) if previous_topics else "기록 없음. '반도체 8대 공정 전체 개요'부터 시작하세요."
     image_pool_str = "\n".join([f"- {img}" for img in WIKI_IMAGES])
     
     system_prompt = """
-    당신은 화학공학을 전공한 반도체 공정 엔지니어이자, 나무위키/노션 스타일의 테크 위키 작성자입니다.
-    이전에 작성된 주제 목록을 분석하여 중복되지 않는 다음 단계의 심화 공정 개념 1가지를 선정하고, 최소 2500자 이상의 매우 상세한 위키 문서를 작성하세요.
+    당신은 화학공학 전공 반도체 엔지니어이자 테크 위키 작성자입니다.
+    이전 주제 목록을 분석하여 중복되지 않는 다음 단계의 심화 공정 개념 1가지를 선정하고, 최소 2500자 이상의 문서를 작성하세요.
 
-    [위키 마크다운 서식 가이드]
-    1. 화학 반응 메커니즘, 열역학적 한계를 상세히 쓰세요.
-    2. 수식(LaTeX) 작성 시 JSON 파싱 에러를 막기 위해 반드시 이중 백슬래시(`\\\\`)를 사용하세요. (예: `\\\\rightarrow`, `\\\\Delta H`) 단일 백슬래시는 파일 저장 시 소실됩니다.
-    3. H2(`##`), H3(`###`)를 사용하여 체계적인 목차 구조를 잡으세요.
+    [화학 반응식 필수 작성 가이드]
+    1. 수식을 작성할 때는 무조건 `$$` 기호로 감싸세요. (예: `$$ \mathrm{SiH}_4 \to \mathrm{Si} + 2\mathrm{H}_2 $$`)
+    2. 블로그 에러를 막기 위해 화학 물질명은 `\text{}` 대신 `\mathrm{}`을 사용하세요.
     """
 
     user_prompt = f"""
@@ -73,7 +72,13 @@ def generate_concept_wiki(previous_topics):
     return post_data['title'], post_data['content']
 
 def save_to_markdown(title, content):
-    print("[2/3] 백과사전 마크다운 파일 생성 중...")
+    print("[2/3] 백과사전 마크다운 파일 생성 및 교정 중...")
+    
+    # 💡 [핵심 안전장치] AI가 잘못 생성한 수식 기호를 블로그 호환(MathJax) 기호로 강제 치환
+    content = content.replace('\\[', '$$').replace('\\]', '$$')
+    content = content.replace('\[', '$$').replace('\]', '$$')
+    content = content.replace('\\text{', '\\mathrm{')
+    
     now = datetime.datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     safe_title = re.sub(r'[^가-힣A-Za-z0-9\s]', '', title).strip().replace(' ', '-')
@@ -99,7 +104,7 @@ mermaid: true
     with open(filename, "w", encoding="utf-8") as f:
         f.write(front_matter + content)
     
-    print(f"✅ 위키 문서 생성 완료: {filename}")
+    print(f"✅ 교정 완료 및 파일 생성: {filename}")
 
 def main():
     print("=== 반도체 기술 백과사전 자동화 시작 ===")
