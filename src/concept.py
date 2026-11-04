@@ -9,8 +9,7 @@ WIKI_IMAGES = [
     "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1200&h=675&q=80",
     "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1200&h=675&q=80",
     "https://images.unsplash.com/photo-1581092580497-e0d23cb11b4f?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1611078518653-568853b0bcce?auto=format&fit=crop&w=1200&h=675&q=80"
+    "https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&w=1200&h=675&q=80"
 ]
 
 def get_previous_concepts():
@@ -31,32 +30,29 @@ def generate_concept_wiki(previous_topics):
     print("[1/3] OpenAI 위키 문서 생성 중...")
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        raise ValueError("OPENAI_API_KEY 환경 변수가 누락되었습니다.")
+        raise ValueError("OPENAI_API_KEY 누락")
         
     client = OpenAI(api_key=api_key)
-    prev_topics_str = "\n".join(previous_topics) if previous_topics else "기록 없음. '반도체 8대 공정 전체 개요'부터 시작하세요."
-    
-    image_md_list = [f"- ![참고 자료]({img})" for img in WIKI_IMAGES]
-    image_pool_str = "\n".join(image_md_list)
+    prev_topics_str = "\n".join(previous_topics) if previous_topics else "기록 없음."
     
     system_prompt = """
     당신은 화학공학 전공 반도체 엔지니어이자 테크 위키 작성자입니다.
-    이전 주제 목록을 분석하여 중복되지 않는 다음 단계의 심화 공정 개념 1가지를 선정하고, 최소 2500자 이상의 문서를 작성하세요.
 
-    [화학 반응식 수식 규칙]
-    수식을 작성할 때는 무조건 `$$` 기호로 감싸세요. (예: `$$ \mathrm{SiH}_4 \to \mathrm{Si} + 2\mathrm{H}_2 $$`)
+    [화학 반응식 절대 규칙 - 위반 시 시스템 붕괴]
+    1. LaTeX 기호(`$$`, `\text`, `\rightarrow`)를 **절대 사용하지 마세요.**
+    2. 무조건 **HTML 태그**를 사용하여 화학식을 작성하세요.
+       - 아래첨자: `<sub>` (예: `SiH<sub>4</sub>`)
+       - 위첨자: `<sup>` (예: `O<sup>2-</sup>`)
+       - 화살표: `&rarr;` (예: `SiH<sub>4</sub> &rarr; Si + 2H<sub>2</sub>`)
+    3. 본문에 이미지를 임의로 삽입하지 마세요. (시스템이 자동으로 삽입합니다)
     """
 
     user_prompt = f"""
     [이전 위키 주제 목록]
     {prev_topics_str}
 
-    [이미지 자동 삽입 가이드]
-    본문 설명 중간중간 아래 제공된 마크다운 코드를 복사해서 삽입하세요.
-    {image_pool_str}
-
-    위 목록을 참고하여 오늘 작성할 1개의 핵심 개념을 스스로 정하고, JSON 형식으로 응답하세요.
-    키는 "concept_title" (기술명), "title" (블로그 제목, "[반도체 백과사전] ~" 형태), "content" (완벽한 마크다운 본문) 세 개입니다.
+    위 목록과 겹치지 않는 다음 단계의 심화 공정 개념 1가지를 정하고 JSON으로 응답하세요.
+    (키: "concept_title", "title", "content")
     """
 
     response = client.chat.completions.create(
@@ -72,12 +68,23 @@ def generate_concept_wiki(previous_topics):
     post_data = json.loads(response.choices[0].message.content)
     return post_data['title'], post_data['content']
 
+def inject_images_deterministically(content, image_list):
+    content = re.sub(r'!\[.*?\]\(.*?\)', '', content)
+    lines = content.split('\n')
+    new_lines = []
+    inserted_count = 0
+    for line in lines:
+        new_lines.append(line)
+        if line.startswith('## ') and inserted_count < 2:
+            img = random.choice(image_list)
+            new_lines.append(f"\n![공정 참고 자료]({img})\n")
+            inserted_count += 1
+    return '\n'.join(new_lines)
+
 def save_to_markdown(title, content):
-    print("[2/3] 백과사전 텍스트 교정 및 마크다운 파일 생성 중...")
+    print("[2/3] 백과사전 이미지 주입 및 파일 생성 중...")
     
-    # 💡 1. 깃허브 블로그 수식 에러 원천 차단
-    content = content.replace('\\', '\\\\')
-    content = content.replace('\\\\\\[', '$$').replace('\\\\\\]', '$$')
+    content = inject_images_deterministically(content, WIKI_IMAGES)
 
     now = datetime.datetime.now()
     date_str = now.strftime("%Y-%m-%d")
@@ -88,7 +95,6 @@ def save_to_markdown(title, content):
     
     header_image = random.choice(WIKI_IMAGES)
     
-    # 💡 2. 이미지 짤림 방지 CSS 추가
     css_injection = """
 <style>
   .post-content img, .preview-img img, .post-header img {
@@ -114,7 +120,7 @@ mermaid: true
     with open(filename, "w", encoding="utf-8") as f:
         f.write(front_matter + content)
     
-    print(f"✅ 교정 완료 및 파일 생성: {filename}")
+    print(f"✅ 파일 생성 완료: {filename}")
 
 def main():
     print("=== 반도체 기술 백과사전 자동화 시작 ===")
