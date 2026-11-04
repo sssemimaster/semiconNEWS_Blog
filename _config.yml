@@ -1,6 +1,6 @@
 # The Site Configuration
-title: 반도체 인사이트 리포트
-tagline: 매일 아침 업데이트되는 글로벌 반도체 & AI 기술 동향
+title: 화공학도의 반도체 공정 노트
+tagline: 화학공학 관점에서 분석하는 최신 반도체 공정 & 소재 기술 동향
 url: 'https://sssemimaster.github.io'
 baseurl: '/semiconNEWS_Blog'
 lang: ko-KR
@@ -9,7 +9,7 @@ timezone: Asia/Seoul
 theme: jekyll-theme-chirpy
 
 description: >-
-  매일 아침 업데이트되는 글로벌 반도체 & AI 기술 동향 리포트입니다.
+  반도체 공정 엔지니어를 꿈꾸는 화공학부생이 매일 기록하는 8대 공정, 첨단 패키징, 신소재 기술 분석 리포트입니다.
 
 github:
   username: sssemimaster
