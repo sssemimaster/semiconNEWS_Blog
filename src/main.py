@@ -17,7 +17,6 @@ RSS_FEEDS = {
 
 HEADERS = {'User-Agent': 'Mozilla/5.0'}
 
-# 16:9 비율로 고정된 반도체/연구실 썸네일 및 본문용 이미지 풀
 TECH_IMAGES = [
     "https://images.unsplash.com/photo-1611078518653-568853b0bcce?auto=format&fit=crop&w=1200&h=675&q=80",
     "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&h=675&q=80",
@@ -52,33 +51,32 @@ def generate_blog_content(articles):
     client = OpenAI(api_key=api_key)
     raw_text = "\n".join(articles[:30])
     today_str = datetime.datetime.now().strftime("%Y년 %m월 %d일")
-    image_pool_str = "\n".join(TECH_IMAGES)
+    
+    # 이미지 URL을 확실히 문자열 리스트로 변환하여 프롬프트에 주입
+    image_pool_str = "\n".join([f"- {img}" for img in TECH_IMAGES])
     
     system_prompt = """
     당신은 화학공학을 전공한 4년차 학부생이자 예비 반도체 공정 엔지니어입니다.
-    제공된 뉴스 기사를 바탕으로 아주 디테일하고 학술적인 롱폼(Long-form, 최소 2500자 이상) 분석 마크다운 아티클을 작성하세요.
+    제공된 뉴스 기사를 바탕으로 아주 디테일하고 학술적인 롱폼(최소 2500자 이상) 분석 마크다운 아티클을 작성하세요.
 
     [작성 및 심화 가이드]
-    1. 겉핥기식 요약이 아닌, 화학공학 전공 지식(화학 반응식, 열역학, 유체 역학, 재료 공학적 특성 등)을 동원하여 기사 속 기술의 원리와 한계점을 깊이 있게 분석하세요.
-    2. 각 섹션은 최소 4~5문단으로 길고 상세하게 작성하세요.
-    3. 적절한 위치에 이모지(🧪, 🔬, ⚙️, ⚡)를 활용하고 핵심 용어는 **굵은 글씨** 처리하세요.
-    4. 내용이 길어지더라도 완전한 형태의 JSON으로 출력하세요.
+    1. 겉핥기식 요약이 아닌, 화학공학 전공 지식(화학 반응식, 열역학, 재료 특성)을 동원하여 깊이 있게 분석하세요.
+    2. 수식(LaTeX) 작성 시 JSON 파싱 에러를 막기 위해 반드시 이중 백슬래시(`\\\\`)를 사용하세요. (예: `\\\\rightarrow`, `\\\\text{기체}`) 절대 단일 백슬래시를 쓰지 마세요.
+    3. 각 섹션은 최소 4~5문단으로 길게 작성하고, 핵심 용어는 **굵은 글씨** 처리하세요.
     """
 
     user_prompt = f"""
-    반드시 JSON 형식으로만 응답하세요. 키는 "title"과 "content" 입니다.
+    반드시 JSON 형식으로 응답하세요. 키는 "title"과 "content" 입니다.
 
     [이미지 자동 삽입 가이드]
-    본문 내용이 전환되는 핵심 섹션(H2) 아래나, 시각적 환기가 필요한 곳에 아래 이미지 URL 중 2~3개를 골라 마크다운 형식으로 삽입하세요.
-    삽입 예시: `![EUV 노광 공정과 화학 반응]({TECH_IMAGES[0]})`
-    사용 가능 이미지 목록:
+    본문 H2 섹션 아래 시각적 환기가 필요한 곳에 다음 URL 중 2~3개를 골라 정확히 그대로 복사하여 마크다운 이미지(`![설명](URL)`)로 삽입하세요. 임의로 URL을 만들면 안 됩니다.
     {image_pool_str}
 
     [마크다운 콘텐츠 필수 구조]
-    - 서론: 오늘의 주요 공정/소재 이슈 개요 (학부생의 시선)
-    - 본론 1~4: 기사에 언급된 공정(식각 가스, 레지스트 반응, 증착 메커니즘 등)에 대한 화공학적 딥다이브 분석.
-    - 본론 5: 오늘의 핵심 화학 물질 및 장비 용어 정리 (마크다운 표 사용)
-    - 결론: 예비 엔지니어로서의 인사이트와 향후 수율 극복 과제
+    - 서론: 오늘의 주요 공정/소재 이슈 개요
+    - 본론 1~4: 기사에 언급된 공정에 대한 화공학적 딥다이브 분석 및 반응식(LaTeX) 포함.
+    - 본론 5: 오늘의 핵심 화학 물질 및 장비 용어 정리 (마크다운 표)
+    - 결론: 예비 엔지니어로서의 인사이트
 
     수집된 기사:
     {raw_text}
@@ -100,17 +98,14 @@ def generate_blog_content(articles):
 def save_to_markdown(title, content):
     print("[3/4] 마크다운 파일 생성 중...")
     now = datetime.datetime.now()
-    
     date_str = now.strftime("%Y-%m-%d")
     safe_title = re.sub(r'[^가-힣A-Za-z0-9\s]', '', title).strip().replace(' ', '-')
     filename = f"_posts/{date_str}-{safe_title}.md"
-    
     if len(filename) > 100:
         filename = f"_posts/{date_str}-daily-process-news.md"
     
     header_image = random.choice(TECH_IMAGES)
     
-    # 💡 image path에 큰따옴표 추가하여 엑스박스 에러 해결
     front_matter = f"""---
 title: "{title}"
 date: {now.strftime("%Y-%m-%d %H:%M:%S +0900")}
@@ -127,15 +122,14 @@ mermaid: true
     with open(filename, "w", encoding="utf-8") as f:
         f.write(front_matter + content)
     
-    print(f"✅ 엑스박스 에러 해결된 파일 생성 완료: {filename}")
+    print(f"✅ 파일 생성 완료: {filename}")
 
 def main():
-    print("=== 화공학도의 반도체 공정 자동화 블로그 시작 ===")
+    print("=== 화공학도의 반도체 공정 블로그 시작 ===")
     articles = collect_news()
     if not articles:
         print("수집된 뉴스가 없습니다.")
         return
-        
     title, content = generate_blog_content(articles)
     save_to_markdown(title, content)
     print("[4/4] 로컬 파일 쓰기 완료.")
