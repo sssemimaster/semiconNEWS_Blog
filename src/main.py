@@ -22,8 +22,7 @@ TECH_IMAGES = [
     "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&h=675&q=80",
     "https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1200&h=675&q=80", 
     "https://images.unsplash.com/photo-1581092335397-9583eb92d232?auto=format&fit=crop&w=1200&h=675&q=80", 
-    "https://images.unsplash.com/photo-1563770660941-20978e870e26?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&w=1200&h=675&q=80"
+    "https://images.unsplash.com/photo-1563770660941-20978e870e26?auto=format&fit=crop&w=1200&h=675&q=80"
 ]
 
 def collect_news():
@@ -39,44 +38,41 @@ def collect_news():
                 link = getattr(entry, 'link', '')
                 articles.append(f"[{source}] {title} ({link})")
         except Exception as e:
-            print(f"[{source}] 수집 건너뜀: {e}")
+            pass
     return articles
 
 def generate_blog_content(articles):
     print("[2/4] OpenAI 분석 본문 생성 중...")
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        raise ValueError("OPENAI_API_KEY 환경 변수가 누락되었습니다.")
+        raise ValueError("OPENAI_API_KEY 누락")
         
     client = OpenAI(api_key=api_key)
     raw_text = "\n".join(articles[:30])
     today_str = datetime.datetime.now().strftime("%Y년 %m월 %d일")
     
-    image_md_list = [f"- ![참고 자료]({img})" for img in TECH_IMAGES]
-    image_pool_str = "\n".join(image_md_list)
-    
     system_prompt = """
-    당신은 화학공학 전공 4년차 학부생이자 예비 반도체 엔지니어입니다.
-    제공된 뉴스를 바탕으로 화학공학 지식(화학 반응식, 열역학)이 포함된 롱폼(최소 2500자) 마크다운 아티클을 작성하세요.
+    당신은 화학공학 전공 반도체 엔지니어입니다. 제공된 뉴스를 바탕으로 화학공학 지식이 포함된 롱폼 아티클을 작성하세요.
 
-    [화학 반응식 수식 규칙]
-    수식을 작성할 때는 무조건 `$$` 기호로 감싸세요. (예: `$$ \mathrm{SiH}_4 \to \mathrm{Si} + 2\mathrm{H}_2 $$`)
+    [화학 반응식 절대 규칙 - 위반 시 시스템 붕괴]
+    1. LaTeX 기호(`$$`, `\text`, `\rightarrow`)를 **절대 사용하지 마세요.**
+    2. 무조건 **HTML 태그**를 사용하여 화학식을 작성하세요.
+       - 아래첨자: `<sub>` (예: `SiH<sub>4</sub>`)
+       - 위첨자: `<sup>` (예: `O<sup>2-</sup>`)
+       - 화살표: `&rarr;` (예: `SiH<sub>4</sub> &rarr; Si + 2H<sub>2</sub>`)
+    3. 본문에 이미지를 임의로 삽입하지 마세요. (시스템이 자동으로 삽입합니다)
     """
 
     user_prompt = f"""
-    반드시 JSON 형식으로 응답하세요. 키는 "title"과 "content" 입니다.
+    반드시 JSON으로 응답하세요. (키: "title", "content")
 
-    [이미지 자동 삽입 가이드]
-    본문 H2 섹션 아래 2~3곳에 아래 제공된 마크다운 코드를 복사해서 삽입하세요.
-    {image_pool_str}
+    [구조]
+    - 서론: 오늘의 이슈 개요
+    - 본론 1~4: 화공학적 딥다이브 (반드시 위 규칙에 맞춘 HTML 화학 반응식 포함)
+    - 본론 5: 용어 정리 (표)
+    - 결론: 인사이트
 
-    [마크다운 콘텐츠 필수 구조]
-    - 서론: 오늘의 주요 공정/소재 이슈 개요
-    - 본론 1~4: 기사에 언급된 공정에 대한 화공학적 딥다이브 분석 및 화학 반응식 포함
-    - 본론 5: 핵심 화학 물질 및 장비 용어 정리 (표)
-    - 결론: 예비 엔지니어로서의 인사이트
-
-    수집된 기사:
+    기사:
     {raw_text}
     """
 
@@ -93,15 +89,30 @@ def generate_blog_content(articles):
     post_data = json.loads(response.choices[0].message.content)
     return post_data['title'], post_data['content']
 
+def inject_images_deterministically(content, image_list):
+    """파이썬이 직접 본문의 H2(##) 아래에 이미지를 꽂아넣어 에러를 0%로 만듭니다."""
+    # 만약 AI가 프롬프트를 무시하고 이미지를 넣었다면 모두 삭제
+    content = re.sub(r'!\[.*?\]\(.*?\)', '', content)
+    
+    lines = content.split('\n')
+    new_lines = []
+    inserted_count = 0
+    
+    for line in lines:
+        new_lines.append(line)
+        # H2 헤더를 만날 때마다 그 아래에 이미지 삽입 (최대 2번)
+        if line.startswith('## ') and inserted_count < 2:
+            img = random.choice(image_list)
+            new_lines.append(f"\n![공정 참고 자료]({img})\n")
+            inserted_count += 1
+            
+    return '\n'.join(new_lines)
+
 def save_to_markdown(title, content):
-    print("[3/4] 마크다운 파일 생성 및 호환성 강제 교정 중...")
+    print("[3/4] 이미지 주입 및 마크다운 파일 생성 중...")
     
-    # 💡 1. 깃허브 블로그 수식 에러 원천 차단: 모든 백슬래시를 2개로 복제
-    # (Kramdown이 백슬래시를 먹어치워도 하나가 남아 수식이 정상 렌더링됨)
-    content = content.replace('\\', '\\\\')
-    
-    # AI가 혹시라도 \[ \] 로 수식을 묶었을 경우 $$ 로 강제 변환
-    content = content.replace('\\\\\\[', '$$').replace('\\\\\\]', '$$')
+    # 이미지 100% 안전 주입
+    content = inject_images_deterministically(content, TECH_IMAGES)
     
     now = datetime.datetime.now()
     date_str = now.strftime("%Y-%m-%d")
@@ -112,10 +123,9 @@ def save_to_markdown(title, content):
     
     header_image = random.choice(TECH_IMAGES)
     
-    # 💡 2. 이미지 짤림(크롭) 방지 CSS 코드 강제 주입
+    # 썸네일 잘림(Crop) 방지 CSS 기본 주입
     css_injection = """
 <style>
-  /* Chirpy 테마의 이미지 짤림(Crop) 현상 강제 방지 */
   .post-content img, .preview-img img, .post-header img {
     object-fit: contain !important;
     background-color: transparent !important;
@@ -139,13 +149,12 @@ mermaid: true
     with open(filename, "w", encoding="utf-8") as f:
         f.write(front_matter + content)
     
-    print(f"✅ 교정 완료 및 파일 생성: {filename}")
+    print(f"✅ 파일 생성 완료: {filename}")
 
 def main():
     print("=== 화공학도의 반도체 공정 블로그 시작 ===")
     articles = collect_news()
     if not articles:
-        print("수집된 뉴스가 없습니다.")
         return
     title, content = generate_blog_content(articles)
     save_to_markdown(title, content)
