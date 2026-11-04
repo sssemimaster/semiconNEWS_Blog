@@ -28,7 +28,7 @@ TECH_IMAGES = [
 
 def collect_news():
     articles = []
-    print("[1/4] 반도체 공정 및 소재 중심 RSS 피드 수집 중...")
+    print("[1/4] 반도체 공정 중심 RSS 수집 중...")
     for source, url in RSS_FEEDS.items():
         try:
             res = requests.get(url, headers=HEADERS, timeout=5)
@@ -43,39 +43,36 @@ def collect_news():
     return articles
 
 def generate_blog_content(articles):
-    print("[2/4] OpenAI로 심층 화공학 분석 본문 생성 중...")
+    print("[2/4] OpenAI 분석 본문 생성 중...")
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        raise ValueError("OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.")
+        raise ValueError("OPENAI_API_KEY 환경 변수가 누락되었습니다.")
         
     client = OpenAI(api_key=api_key)
     raw_text = "\n".join(articles[:30])
     today_str = datetime.datetime.now().strftime("%Y년 %m월 %d일")
-    
-    # 이미지 URL을 확실히 문자열 리스트로 변환하여 프롬프트에 주입
     image_pool_str = "\n".join([f"- {img}" for img in TECH_IMAGES])
     
     system_prompt = """
-    당신은 화학공학을 전공한 4년차 학부생이자 예비 반도체 공정 엔지니어입니다.
-    제공된 뉴스 기사를 바탕으로 아주 디테일하고 학술적인 롱폼(최소 2500자 이상) 분석 마크다운 아티클을 작성하세요.
+    당신은 화학공학 전공 4년차 학부생이자 예비 반도체 엔지니어입니다.
+    제공된 뉴스를 바탕으로 화학공학 지식(반응식, 열역학)이 포함된 롱폼(최소 2500자) 마크다운 아티클을 작성하세요.
 
-    [작성 및 심화 가이드]
-    1. 겉핥기식 요약이 아닌, 화학공학 전공 지식(화학 반응식, 열역학, 재료 특성)을 동원하여 깊이 있게 분석하세요.
-    2. 수식(LaTeX) 작성 시 JSON 파싱 에러를 막기 위해 반드시 이중 백슬래시(`\\\\`)를 사용하세요. (예: `\\\\rightarrow`, `\\\\text{기체}`) 절대 단일 백슬래시를 쓰지 마세요.
-    3. 각 섹션은 최소 4~5문단으로 길게 작성하고, 핵심 용어는 **굵은 글씨** 처리하세요.
+    [작성 가이드]
+    1. 수식을 작성할 때는 무조건 `$$` 기호로 감싸세요. (예: `$$ \mathrm{SiH}_4 \to \mathrm{Si} + 2\mathrm{H}_2 $$`)
+    2. 블로그 에러를 막기 위해 화학 물질명은 `\text{}` 대신 `\mathrm{}`을 사용하세요.
     """
 
     user_prompt = f"""
     반드시 JSON 형식으로 응답하세요. 키는 "title"과 "content" 입니다.
 
     [이미지 자동 삽입 가이드]
-    본문 H2 섹션 아래 시각적 환기가 필요한 곳에 다음 URL 중 2~3개를 골라 정확히 그대로 복사하여 마크다운 이미지(`![설명](URL)`)로 삽입하세요. 임의로 URL을 만들면 안 됩니다.
+    본문 H2 섹션 아래 2~3곳에 다음 URL을 정확히 복사하여 마크다운 이미지(`![설명](URL)`)로 삽입하세요.
     {image_pool_str}
 
     [마크다운 콘텐츠 필수 구조]
     - 서론: 오늘의 주요 공정/소재 이슈 개요
-    - 본론 1~4: 기사에 언급된 공정에 대한 화공학적 딥다이브 분석 및 반응식(LaTeX) 포함.
-    - 본론 5: 오늘의 핵심 화학 물질 및 장비 용어 정리 (마크다운 표)
+    - 본론 1~4: 기사에 언급된 공정에 대한 화공학적 딥다이브 분석 및 화학 반응식 포함
+    - 본론 5: 핵심 화학 물질 및 장비 용어 정리 (표)
     - 결론: 예비 엔지니어로서의 인사이트
 
     수집된 기사:
@@ -96,7 +93,13 @@ def generate_blog_content(articles):
     return post_data['title'], post_data['content']
 
 def save_to_markdown(title, content):
-    print("[3/4] 마크다운 파일 생성 중...")
+    print("[3/4] 마크다운 파일 생성 및 호환성 교정 중...")
+    
+    # 💡 [핵심 안전장치] AI가 잘못 생성한 수식 기호를 블로그 호환(MathJax) 기호로 강제 치환
+    content = content.replace('\\[', '$$').replace('\\]', '$$')
+    content = content.replace('\[', '$$').replace('\]', '$$')
+    content = content.replace('\\text{', '\\mathrm{')
+    
     now = datetime.datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     safe_title = re.sub(r'[^가-힣A-Za-z0-9\s]', '', title).strip().replace(' ', '-')
@@ -122,7 +125,7 @@ mermaid: true
     with open(filename, "w", encoding="utf-8") as f:
         f.write(front_matter + content)
     
-    print(f"✅ 파일 생성 완료: {filename}")
+    print(f"✅ 교정 완료 및 파일 생성: {filename}")
 
 def main():
     print("=== 화공학도의 반도체 공정 블로그 시작 ===")
