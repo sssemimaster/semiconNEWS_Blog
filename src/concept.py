@@ -17,7 +17,6 @@ def get_previous_concepts():
     concepts = []
     if not os.path.exists("_posts"):
         return concepts
-        
     for filename in os.listdir("_posts"):
         if filename.endswith(".md"):
             with open(os.path.join("_posts", filename), "r", encoding="utf-8") as f:
@@ -35,18 +34,17 @@ def generate_concept_wiki(previous_topics):
         raise ValueError("OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.")
         
     client = OpenAI(api_key=api_key)
-    today_str = datetime.datetime.now().strftime("%Y년 %m월 %d일")
     prev_topics_str = "\n".join(previous_topics) if previous_topics else "기록 없음. 가장 기초적인 '반도체 8대 공정 전체 개요'부터 시작하세요."
-    image_pool_str = "\n".join(WIKI_IMAGES)
+    image_pool_str = "\n".join([f"- {img}" for img in WIKI_IMAGES])
     
     system_prompt = """
     당신은 화학공학을 전공한 반도체 공정 엔지니어이자, 나무위키/노션 스타일의 테크 위키 작성자입니다.
     이전에 작성된 주제 목록을 분석하여 중복되지 않는 다음 단계의 심화 공정 개념 1가지를 선정하고, 최소 2500자 이상의 매우 상세한 위키 문서를 작성하세요.
 
     [위키 마크다운 서식 가이드]
-    1. **노션 스타일 요약**: 서론은 `> **💡 핵심 요약**` 콜아웃으로 시작하세요.
-    2. **화공학적 딥다이브**: 해당 기술의 화학 반응 메커니즘, 열역학적 한계, 공학적 극복 사례를 학부 전공 수준으로 상세히 풀어 쓰세요.
-    3. H2(`##`), H3(`###`)를 사용하여 나무위키처럼 체계적인 목차 구조를 잡으세요.
+    1. 화학 반응 메커니즘, 열역학적 한계를 상세히 쓰세요.
+    2. 수식(LaTeX) 작성 시 JSON 파싱 에러를 막기 위해 반드시 이중 백슬래시(`\\\\`)를 사용하세요. (예: `\\\\rightarrow`, `\\\\Delta H`) 단일 백슬래시는 파일 저장 시 소실됩니다.
+    3. H2(`##`), H3(`###`)를 사용하여 체계적인 목차 구조를 잡으세요.
     """
 
     user_prompt = f"""
@@ -54,8 +52,7 @@ def generate_concept_wiki(previous_topics):
     {prev_topics_str}
 
     [이미지 자동 삽입 가이드]
-    본문 설명 중간중간 시각적 자료가 들어가면 좋을 위치에 아래 이미지 URL 중 1~2개를 골라 `![이미지 설명](URL)` 마크다운 형식으로 삽입하세요.
-    사용 가능 이미지 목록:
+    본문 설명 중간중간 아래 제공된 URL 중 1~2개를 골라 정확히 복사하여 `![이미지 설명](URL)` 마크다운 형식으로 삽입하세요.
     {image_pool_str}
 
     위 목록을 참고하여 오늘 작성할 1개의 핵심 개념을 스스로 정하고, JSON 형식으로 응답하세요.
@@ -78,17 +75,14 @@ def generate_concept_wiki(previous_topics):
 def save_to_markdown(title, content):
     print("[2/3] 백과사전 마크다운 파일 생성 중...")
     now = datetime.datetime.now()
-    
     date_str = now.strftime("%Y-%m-%d")
     safe_title = re.sub(r'[^가-힣A-Za-z0-9\s]', '', title).strip().replace(' ', '-')
     filename = f"_posts/{date_str}-wiki-{safe_title}.md"
-    
     if len(filename) > 100:
         filename = f"_posts/{date_str}-wiki-semicon-concept.md"
     
     header_image = random.choice(WIKI_IMAGES)
     
-    # 💡 image path에 큰따옴표 추가
     front_matter = f"""---
 title: "{title}"
 date: {now.strftime("%Y-%m-%d %H:%M:%S +0900")}
@@ -105,7 +99,7 @@ mermaid: true
     with open(filename, "w", encoding="utf-8") as f:
         f.write(front_matter + content)
     
-    print(f"✅ 엑스박스 에러 해결된 위키 문서 생성 완료: {filename}")
+    print(f"✅ 위키 문서 생성 완료: {filename}")
 
 def main():
     print("=== 반도체 기술 백과사전 자동화 시작 ===")
