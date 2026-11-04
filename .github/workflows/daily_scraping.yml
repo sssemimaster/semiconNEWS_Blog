@@ -1,4 +1,4 @@
-name: Daily Semiconductor Process News Scraping
+name: Daily Semiconductor News & Wiki Scraping
 
 on:
   schedule:
@@ -25,16 +25,22 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: 뉴스 스크랩 및 마크다운 파일 생성
+    - name: 1. 일일 공정/소재 뉴스 브리핑 생성
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       run: |
         python src/main.py
+
+    - name: 2. 반도체 기술 백과사전 위키 생성
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      run: |
+        python src/concept.py
 
     - name: GitHub 저장소에 변경사항 커밋 및 푸시
       run: |
         git config --global user.name 'github-actions[bot]'
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
         git add _posts/
-        git commit -m "docs: 🧪 화공학도의 시선으로 본 오늘의 공정 기술 분석 자동 포스팅" || echo "No changes to commit"
+        git commit -m "docs: 🧪 화공학도 일일 뉴스 브리핑 & 기술 백과사전 자동 업데이트" || echo "No changes to commit"
         git push origin main
