@@ -52,25 +52,22 @@ def generate_blog_content(articles):
     raw_text = "\n".join(articles[:30])
     today_str = datetime.datetime.now().strftime("%Y년 %m월 %d일")
     
-    # AI가 헷갈리지 않게 아예 완성된 마크다운 코드를 제공
     image_md_list = [f"- ![참고 자료]({img})" for img in TECH_IMAGES]
     image_pool_str = "\n".join(image_md_list)
     
     system_prompt = """
     당신은 화학공학 전공 4년차 학부생이자 예비 반도체 엔지니어입니다.
-    제공된 뉴스를 바탕으로 화학공학 지식(반응식, 열역학)이 포함된 롱폼(최소 2500자) 마크다운 아티클을 작성하세요.
+    제공된 뉴스를 바탕으로 화학공학 지식(화학 반응식, 열역학)이 포함된 롱폼(최소 2500자) 마크다운 아티클을 작성하세요.
 
-    [작성 가이드]
-    1. 화학 반응식이나 수식을 작성할 때는 무조건 `$$` 기호로 감싸세요. (예: `$$ \mathrm{SiH}_4 \to \mathrm{Si} + 2\mathrm{H}_2 $$`)
+    [화학 반응식 수식 규칙]
+    수식을 작성할 때는 무조건 `$$` 기호로 감싸세요. (예: `$$ \mathrm{SiH}_4 \to \mathrm{Si} + 2\mathrm{H}_2 $$`)
     """
 
     user_prompt = f"""
     반드시 JSON 형식으로 응답하세요. 키는 "title"과 "content" 입니다.
 
     [이미지 자동 삽입 가이드]
-    본문 H2 섹션 아래 2~3곳에 아래 제공된 마크다운 코드를 1글자도 바꾸지 말고 그대로 복사해서 삽입하세요. (절대 URL 앞뒤에 따옴표를 넣지 마세요!)
-    
-    사용 가능한 마크다운 이미지 코드:
+    본문 H2 섹션 아래 2~3곳에 아래 제공된 마크다운 코드를 복사해서 삽입하세요.
     {image_pool_str}
 
     [마크다운 콘텐츠 필수 구조]
@@ -89,7 +86,7 @@ def generate_blog_content(articles):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
-        temperature=0.6,
+        temperature=0.5,
         response_format={"type": "json_object"}
     )
     
@@ -97,24 +94,15 @@ def generate_blog_content(articles):
     return post_data['title'], post_data['content']
 
 def save_to_markdown(title, content):
-    print("[3/4] 텍스트 교정 및 마크다운 파일 생성 중...")
+    print("[3/4] 마크다운 파일 생성 및 호환성 강제 교정 중...")
     
-    # 💡 1. 괄호 수식을 블로그 호환형 $$ 수식으로 강제 변경
-    content = content.replace('\\[', '$$').replace('\\]', '$$')
-    content = content.replace('\[', '$$').replace('\]', '$$')
+    # 💡 1. 깃허브 블로그 수식 에러 원천 차단: 모든 백슬래시를 2개로 복제
+    # (Kramdown이 백슬래시를 먹어치워도 하나가 남아 수식이 정상 렌더링됨)
+    content = content.replace('\\', '\\\\')
     
-    # 💡 2. Kramdown 파서가 백슬래시를 먹어치우는 현상(ext 에러) 원천 차단
-    # 자주 쓰이는 기호들의 백슬래시를 강제로 2개로 늘림
-    latex_commands = ['text', 'mathrm', 'rightarrow', 'to', 'leftarrow', 'uparrow', 'downarrow', 'Delta', 'mu', 'alpha', 'beta', 'gamma']
-    for cmd in latex_commands:
-        content = content.replace(f'\\{cmd}', f'\\\\{cmd}')
-        
-    # 💡 3. \text 폰트 깨짐 방지를 위해 \mathrm으로 일괄 변경
-    content = content.replace(r'\\text', r'\\mathrm')
+    # AI가 혹시라도 \[ \] 로 수식을 묶었을 경우 $$ 로 강제 변환
+    content = content.replace('\\\\\\[', '$$').replace('\\\\\\]', '$$')
     
-    # 💡 4. AI가 괄호 안에 따옴표를 넣은 엑스박스 이미지 강제 교정
-    content = content.replace('("https://images', '(https://images').replace('80")', '80)')
-
     now = datetime.datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     safe_title = re.sub(r'[^가-힣A-Za-z0-9\s]', '', title).strip().replace(' ', '-')
@@ -124,6 +112,17 @@ def save_to_markdown(title, content):
     
     header_image = random.choice(TECH_IMAGES)
     
+    # 💡 2. 이미지 짤림(크롭) 방지 CSS 코드 강제 주입
+    css_injection = """
+<style>
+  /* Chirpy 테마의 이미지 짤림(Crop) 현상 강제 방지 */
+  .post-content img, .preview-img img, .post-header img {
+    object-fit: contain !important;
+    background-color: transparent !important;
+  }
+</style>
+"""
+
     front_matter = f"""---
 title: "{title}"
 date: {now.strftime("%Y-%m-%d %H:%M:%S +0900")}
@@ -134,7 +133,7 @@ image:
 math: true
 mermaid: true
 ---
-
+{css_injection}
 """
     os.makedirs("_posts", exist_ok=True)
     with open(filename, "w", encoding="utf-8") as f:
