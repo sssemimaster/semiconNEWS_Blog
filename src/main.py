@@ -10,22 +10,34 @@ RSS_FEEDS = {
     '반도체이슈': 'https://news.google.com/rss/search?q=반도체+동향+OR+투자+OR+수율+when:1d&hl=ko&gl=KR&ceid=KR:ko',
     '공정/소재': 'https://news.google.com/rss/search?q=반도체+공정+OR+소재+OR+EUV+when:1d&hl=ko&gl=KR&ceid=KR:ko'
 }
-
 HEADERS = {'User-Agent': 'Mozilla/5.0'}
 
-# 💡 고화질 반도체/연구실 이미지 풀 확장
-HEADER_IMAGES = [
+# API 실패 시 블로그가 멈추지 않도록 비상용 이미지 탑재
+FALLBACK_IMAGES = [
     "https://images.unsplash.com/photo-1611078518653-568853b0bcce?auto=format&fit=crop&w=1200&h=675&q=80",
     "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1563770660941-20978e870e26?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1581092580497-e0d23cb11b4f?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1200&h=675&q=80"
+    "https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1200&h=675&q=80"
 ]
+
+def get_dynamic_image():
+    """💡 Unsplash API를 통해 반도체/화공학 관련 고화질 이미지를 실시간으로 뽑아옵니다."""
+    api_key = os.environ.get("UNSPLASH_API_KEY")
+    if not api_key:
+        return random.choice(FALLBACK_IMAGES)
+    
+    queries = ["semiconductor", "microchip", "silicon wafer", "chemistry lab", "cleanroom", "electronic circuit"]
+    query = random.choice(queries)
+    
+    try:
+        url = f"https://api.unsplash.com/photos/random?query={query}&client_id={api_key}"
+        res = requests.get(url, timeout=5)
+        res.raise_for_status()
+        data = res.json()
+        # 블로그 썸네일에 완벽한 16:9 비율 파라미터 강제 주입
+        return data['urls']['raw'] + "&w=1200&h=675&fit=crop&q=80"
+    except Exception as e:
+        print(f"이미지 API 호출 실패 (비상용 이미지 대체): {e}")
+        return random.choice(FALLBACK_IMAGES)
 
 def collect_news():
     articles = []
@@ -55,17 +67,17 @@ def generate_blog_content(articles):
     1. 사진 삽입 금지, 수식은 반드시 HTML(<sub>, <sup>, &rarr;)만 사용 (LaTeX 금지).
     2. 블로그 홈에서 잘 보이도록 글의 서두에 인용구(`>`)로 핵심을 3줄 요약하세요.
     3. 본문 구조는 다음을 따르세요:
-       - ## 📰 오늘의 반도체 핫이슈 (기사 바탕 동향 요약)
-       - ## 🔬 엔지니어의 시선: 기술 분석 (이슈에 얽힌 공정/소재 기술 원리를 Mermaid 다이어그램 등으로 시각화)
+       - ## 📰 오늘의 반도체 핫이슈
+       - ## 🔬 엔지니어의 시선: 기술 분석 (이슈에 얽힌 원리를 Mermaid 다이어그램으로 시각화)
        - ## 💡 시장 전망 및 시사점
     """
 
     user_prompt = f"""
     반드시 아래 양식의 순수 텍스트로만 출력하세요. (JSON 금지)
     
-    Title: [일일브리핑] (오늘 가장 중요한 이슈를 포함한 매력적인 제목)
+    Title: [일일브리핑] (제목)
     Content:
-    [서론 요약, 본론, 결론으로 구성된 마크다운]
+    [본문]
 
     수집된 기사:
     {raw_text}
@@ -81,41 +93,38 @@ def generate_blog_content(articles):
     try:
         title = re.search(r'Title:\s*(.*)', full_text, re.IGNORECASE).group(1).strip()
         content = re.search(r'Content:\s*(.*)', full_text, re.IGNORECASE | re.DOTALL).group(1).strip()
-    except AttributeError:
+    except:
         title = f"[일일브리핑] {datetime.datetime.now().strftime('%m월 %d일')} 반도체 동향"
         content = full_text
         
     return title, content
 
-def get_unique_image(image_pool):
-    """💡 최근 작성된 글 10개의 썸네일을 분석하여 겹치지 않는 이미지를 반환합니다."""
-    used_images = []
-    if os.path.exists("_posts"):
-        files = sorted(os.listdir("_posts"), reverse=True)[:10]
-        for filename in files:
-            if filename.endswith(".md"):
-                with open(os.path.join("_posts", filename), "r", encoding="utf-8") as f:
-                    content = f.read()
-                    match = re.search(r'image:\s*path:\s*"(.*?)"', content)
-                    if match:
-                        used_images.append(match.group(1))
-    
-    available_images = [img for img in image_pool if img not in used_images]
-    if not available_images: # 모든 이미지를 다 썼다면 다시 전체 풀에서 무작위 선택
-        available_images = image_pool
-        
-    return random.choice(available_images)
+def inject_html_images(content):
+    lines = content.split('\n')
+    new_lines = []
+    img_count = 0
+    for line in lines:
+        new_lines.append(line)
+        if line.startswith('## ') and img_count < 2:
+            img = get_dynamic_image()
+            html_img = f'\n<img src="{img}" alt="반도체 공정 자료" style="width:100%; border-radius:12px; margin: 20px 0;">\n'
+            new_lines.append(html_img)
+            img_count += 1
+    return '\n'.join(new_lines)
 
 def save_to_markdown(title, content):
-    print("[3/3] 파일 저장 중...")
+    print("[3/3] 동적 이미지 주입 및 파일 저장 중...")
+    
+    content = content.replace('\\', '\\\\')
+    content = inject_html_images(content)
     
     now = datetime.datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     safe_title = re.sub(r'[^가-힣A-Za-z0-9\s]', '', title).strip().replace(' ', '-')
     filename = f"_posts/{date_str}-{safe_title}.md"
     
-    # 💡 겹치지 않는 썸네일 이미지 자동 추출
-    header_image = get_unique_image(HEADER_IMAGES)
+    # 썸네일도 실시간 검색 이미지 적용
+    header_image = get_dynamic_image()
     
     front_matter = f"""---
 title: "{title}"
@@ -132,7 +141,6 @@ mermaid: true
     os.makedirs("_posts", exist_ok=True)
     with open(filename, "w", encoding="utf-8") as f:
         f.write(front_matter + content)
-    
     print(f"✅ 뉴스 파일 생성 완료")
 
 def main():
