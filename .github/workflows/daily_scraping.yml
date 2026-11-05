@@ -2,7 +2,7 @@ name: Daily Semiconductor News & Wiki Scraping
 
 on:
   schedule:
-    - cron: '0 20 * * *' # 매일 한국 시간 오전 5시 실행
+    - cron: '0 20 * * *'
   workflow_dispatch:
 
 jobs:
@@ -28,16 +28,18 @@ jobs:
     - name: 1. 일일 공정/소재 뉴스 브리핑 생성
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        UNSPLASH_API_KEY: ${{ secrets.UNSPLASH_API_KEY }} # 💡 이미지 API 키 추가
       run: |
         python src/main.py
 
     - name: 2. 반도체 기술 백과사전 위키 생성
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        UNSPLASH_API_KEY: ${{ secrets.UNSPLASH_API_KEY }} # 💡 이미지 API 키 추가
       run: |
         python src/concept.py
 
-    - name: GitHub 저장소에 변경사항 커밋 및 푸시
+    - name: GitHub 저장소에 커밋 및 푸시
       run: |
         git config --global user.name 'github-actions[bot]'
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
