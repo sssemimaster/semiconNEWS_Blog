@@ -88,3 +88,5 @@ jekyll-archives:
   permalinks:
     tag: /tags/:name/
     category: /categories/:name/
+
+avatar: "https://github.com/sssemimaster.png"
