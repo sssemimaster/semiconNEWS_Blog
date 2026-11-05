@@ -13,10 +13,18 @@ RSS_FEEDS = {
 
 HEADERS = {'User-Agent': 'Mozilla/5.0'}
 
+# 💡 고화질 반도체/연구실 이미지 풀 확장
 HEADER_IMAGES = [
     "https://images.unsplash.com/photo-1611078518653-568853b0bcce?auto=format&fit=crop&w=1200&h=675&q=80",
     "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1200&h=675&q=80"
+    "https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1200&h=675&q=80",
+    "https://images.unsplash.com/photo-1563770660941-20978e870e26?auto=format&fit=crop&w=1200&h=675&q=80",
+    "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1200&h=675&q=80",
+    "https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&w=1200&h=675&q=80",
+    "https://images.unsplash.com/photo-1581092580497-e0d23cb11b4f?auto=format&fit=crop&w=1200&h=675&q=80",
+    "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1200&h=675&q=80",
+    "https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?auto=format&fit=crop&w=1200&h=675&q=80",
+    "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1200&h=675&q=80"
 ]
 
 def collect_news():
@@ -79,6 +87,25 @@ def generate_blog_content(articles):
         
     return title, content
 
+def get_unique_image(image_pool):
+    """💡 최근 작성된 글 10개의 썸네일을 분석하여 겹치지 않는 이미지를 반환합니다."""
+    used_images = []
+    if os.path.exists("_posts"):
+        files = sorted(os.listdir("_posts"), reverse=True)[:10]
+        for filename in files:
+            if filename.endswith(".md"):
+                with open(os.path.join("_posts", filename), "r", encoding="utf-8") as f:
+                    content = f.read()
+                    match = re.search(r'image:\s*path:\s*"(.*?)"', content)
+                    if match:
+                        used_images.append(match.group(1))
+    
+    available_images = [img for img in image_pool if img not in used_images]
+    if not available_images: # 모든 이미지를 다 썼다면 다시 전체 풀에서 무작위 선택
+        available_images = image_pool
+        
+    return random.choice(available_images)
+
 def save_to_markdown(title, content):
     print("[3/3] 파일 저장 중...")
     
@@ -87,9 +114,9 @@ def save_to_markdown(title, content):
     safe_title = re.sub(r'[^가-힣A-Za-z0-9\s]', '', title).strip().replace(' ', '-')
     filename = f"_posts/{date_str}-{safe_title}.md"
     
-    header_image = random.choice(HEADER_IMAGES)
+    # 💡 겹치지 않는 썸네일 이미지 자동 추출
+    header_image = get_unique_image(HEADER_IMAGES)
     
-    # 카테고리를 명확히 '뉴스/동향'으로 분리
     front_matter = f"""---
 title: "{title}"
 date: {now.strftime("%Y-%m-%d %H:%M:%S +0900")}
