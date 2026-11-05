@@ -30,7 +30,7 @@ def generate_concept_wiki(previous_topics):
     
     system_prompt = """
     당신은 화학공학 전공 테크 위키 작성자입니다.
-    글을 읽는 독자가 나무위키나 노션(Notion)의 잘 정리된 기술 위키를 보는 것처럼 느끼도록 아주 체계적으로 구조화된 글을 쓰세요.
+    글을 읽는 독자가 나무위키의 잘 정리된 기술 위키를 보는 것처럼 느끼도록 체계적으로 구조화된 글을 쓰세요.
     
     [위키 템플릿 - 반드시 이 목차 구조를 따를 것]
     ## 1. 개념 개요 (Overview)
@@ -47,7 +47,7 @@ def generate_concept_wiki(previous_topics):
     user_prompt = f"""
     반드시 아래 양식의 순수 텍스트로만 출력하세요.
     
-    Title: (주제명만 간결하게, 예: EUV 노광 공정의 화학적 메커니즘)
+    Title: [반도체 백과사전] (선정한 주제명만 간결하게)
     Content:
     [제시된 위키 템플릿에 맞춘 마크다운 본문]
 
@@ -68,8 +68,13 @@ def generate_concept_wiki(previous_topics):
         title = re.search(r'Title:\s*(.*)', full_text, re.IGNORECASE).group(1).strip()
         content = re.search(r'Content:\s*(.*)', full_text, re.IGNORECASE | re.DOTALL).group(1).strip()
     except AttributeError:
-        title = f"{datetime.datetime.now().strftime('%m월 %d일')} 반도체 공정 딥다이브"
+        title = f"[반도체 백과사전] {datetime.datetime.now().strftime('%m월 %d일')} 반도체 공정 딥다이브"
         content = full_text
+    
+    # 💡 제목이 무조건 [반도체 백과사전]으로 시작하도록 강제 정제
+    title = title.replace('[기술위키]', '').strip()
+    if not title.startswith("[반도체 백과사전]"):
+        title = f"[반도체 백과사전] {title}"
         
     return title, content
 
@@ -83,9 +88,8 @@ def save_to_markdown(title, content):
     
     header_image = random.choice(HEADER_IMAGES)
     
-    # 💡 [핵심] series 태그를 추가하여 모든 위키 글이 하나의 네비게이션으로 묶이도록 설정
     front_matter = f"""---
-title: "[기술위키] {title}"
+title: "{title}"
 date: {now.strftime("%Y-%m-%d %H:%M:%S +0900")}
 categories: [반도체 백과사전, 공정기술]
 tags: [반도체위키, 8대공정, 딥다이브]
