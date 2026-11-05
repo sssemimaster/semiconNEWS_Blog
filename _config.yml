@@ -1,7 +1,7 @@
 # The Site Configuration
 title: 화공학도의 반도체 공정 노트
 tagline: 화학공학 관점에서 분석하는 최신 반도체 공정 & 소재 기술 동향
-url: 'https://sssemimaster.github.io'
+url: 'https://sssemimaster.github.io/semiconNEWS_Blog'
 baseurl: '/semiconNEWS_Blog'
 lang: ko-KR
 timezone: Asia/Seoul
