@@ -4,7 +4,7 @@ date: 2026-11-04 20:38:00 +0900
 categories: [반도체 백과사전, 공정기술]
 tags: [반도체사전, 화학공학, 공정엔지니어, 테크위키]
 image:
-  path: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1200&h=675&q=80"
+  path: "https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?auto=format&fit=crop&w=1200&h=675&q=80"
 math: true
 mermaid: true
 ---
