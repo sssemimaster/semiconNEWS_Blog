@@ -2,21 +2,31 @@ import os
 import datetime
 import re
 import random
+import requests
 from openai import OpenAI
 
-# 💡 고화질 반도체/연구실 이미지 풀 확장
-HEADER_IMAGES = [
-    "https://images.unsplash.com/photo-1611078518653-568853b0bcce?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1563770660941-20978e870e26?auto=format&fit=crop&w=1200&h=675&q=80",
+FALLBACK_IMAGES = [
     "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1581092580497-e0d23cb11b4f?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1200&h=675&q=80"
+    "https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&w=1200&h=675&q=80"
 ]
+
+def get_dynamic_image():
+    """💡 Unsplash API 연동 함수"""
+    api_key = os.environ.get("UNSPLASH_API_KEY")
+    if not api_key:
+        return random.choice(FALLBACK_IMAGES)
+    
+    queries = ["silicon wafer", "nanotechnology", "chemistry lab", "cleanroom", "semiconductor manufacturing"]
+    query = random.choice(queries)
+    
+    try:
+        url = f"https://api.unsplash.com/photos/random?query={query}&client_id={api_key}"
+        res = requests.get(url, timeout=5)
+        res.raise_for_status()
+        data = res.json()
+        return data['urls']['raw'] + "&w=1200&h=675&fit=crop&q=80"
+    except:
+        return random.choice(FALLBACK_IMAGES)
 
 def get_previous_concepts():
     concepts = []
@@ -39,17 +49,16 @@ def generate_concept_wiki(previous_topics):
     
     system_prompt = """
     당신은 화학공학 전공 테크 위키 작성자입니다.
-    글을 읽는 독자가 나무위키의 잘 정리된 기술 위키를 보는 것처럼 느끼도록 체계적으로 구조화된 글을 쓰세요.
     
     [위키 템플릿 - 반드시 이 목차 구조를 따를 것]
     ## 1. 개념 개요 (Overview)
     ## 2. 핵심 작동 원리 (Mechanism) - 반드시 Mermaid 다이어그램 포함
-    ## 3. 공정 파라미터 및 주요 소재 (Materials & Variables) - 반드시 마크다운 표(Table) 포함
-    ## 4. 한계점 및 최신 기술 동향 (Trends & Challenges)
+    ## 3. 공정 파라미터 및 주요 소재 (Materials & Variables) - 표 포함
+    ## 4. 한계점 및 최신 기술 동향 (Trends)
 
     [규칙]
     1. 사진(이미지) 삽입 절대 금지.
-    2. 수식은 LaTeX(백슬래시) 절대 금지. HTML 태그(<sub>, <sup>, &rarr;)만 사용.
+    2. 수식은 LaTeX 절대 금지. HTML 태그(<sub>, <sup>, &rarr;)만 사용.
     3. 최소 3000자 이상의 매우 상세한 딥다이브 문서를 작성하세요.
     """
 
@@ -58,12 +67,12 @@ def generate_concept_wiki(previous_topics):
     
     Title: [반도체 백과사전] (선정한 주제명만 간결하게)
     Content:
-    [제시된 위키 템플릿에 맞춘 마크다운 본문]
+    [템플릿에 맞춘 본문]
 
-    이전 위키 주제 목록:
+    이전 주제 목록:
     {prev_topics_str}
     
-    위 목록과 겹치지 않는 다음 단계의 심화 공정 개념 1가지를 정하여 작성하세요.
+    위 목록과 겹치지 않는 다음 단계의 개념 1가지를 정하여 작성하세요.
     """
 
     response = client.chat.completions.create(
@@ -76,8 +85,8 @@ def generate_concept_wiki(previous_topics):
     try:
         title = re.search(r'Title:\s*(.*)', full_text, re.IGNORECASE).group(1).strip()
         content = re.search(r'Content:\s*(.*)', full_text, re.IGNORECASE | re.DOTALL).group(1).strip()
-    except AttributeError:
-        title = f"[반도체 백과사전] {datetime.datetime.now().strftime('%m월 %d일')} 반도체 공정 딥다이브"
+    except:
+        title = f"[반도체 백과사전] {datetime.datetime.now().strftime('%m월 %d일')} 공정 딥다이브"
         content = full_text
     
     title = title.replace('[기술위키]', '').strip()
@@ -86,35 +95,31 @@ def generate_concept_wiki(previous_topics):
         
     return title, content
 
-def get_unique_image(image_pool):
-    """💡 최근 작성된 글 10개의 썸네일을 분석하여 겹치지 않는 이미지를 반환합니다."""
-    used_images = []
-    if os.path.exists("_posts"):
-        files = sorted(os.listdir("_posts"), reverse=True)[:10]
-        for filename in files:
-            if filename.endswith(".md"):
-                with open(os.path.join("_posts", filename), "r", encoding="utf-8") as f:
-                    content = f.read()
-                    match = re.search(r'image:\s*path:\s*"(.*?)"', content)
-                    if match:
-                        used_images.append(match.group(1))
-    
-    available_images = [img for img in image_pool if img not in used_images]
-    if not available_images:
-        available_images = image_pool
-        
-    return random.choice(available_images)
+def inject_html_images(content):
+    lines = content.split('\n')
+    new_lines = []
+    img_count = 0
+    for line in lines:
+        new_lines.append(line)
+        if line.startswith('## ') and img_count < 2:
+            img = get_dynamic_image()
+            html_img = f'\n<img src="{img}" alt="공정 딥다이브 자료" style="width:100%; border-radius:12px; margin: 20px 0;">\n'
+            new_lines.append(html_img)
+            img_count += 1
+    return '\n'.join(new_lines)
 
 def save_to_markdown(title, content):
     print("[2/3] 마크다운 파일(시리즈 연동) 생성 중...")
+    
+    content = content.replace('\\', '\\\\')
+    content = inject_html_images(content)
     
     now = datetime.datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     safe_title = re.sub(r'[^가-힣A-Za-z0-9\s]', '', title).strip().replace(' ', '-')
     filename = f"_posts/{date_str}-wiki-{safe_title}.md"
     
-    # 💡 겹치지 않는 썸네일 이미지 자동 추출
-    header_image = get_unique_image(HEADER_IMAGES)
+    header_image = get_dynamic_image()
     
     front_matter = f"""---
 title: "{title}"
@@ -132,7 +137,6 @@ mermaid: true
     os.makedirs("_posts", exist_ok=True)
     with open(filename, "w", encoding="utf-8") as f:
         f.write(front_matter + content)
-    
     print(f"✅ 위키 파일 생성 완료")
 
 def main():
