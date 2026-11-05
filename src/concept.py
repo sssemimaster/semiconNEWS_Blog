@@ -6,8 +6,6 @@ from openai import OpenAI
 
 HEADER_IMAGES = [
     "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1581092580497-e0d23cb11b4f?auto=format&fit=crop&w=1200&h=675&q=80",
     "https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&w=1200&h=675&q=80"
 ]
 
@@ -18,40 +16,40 @@ def get_previous_concepts():
         if filename.endswith(".md"):
             with open(os.path.join("_posts", filename), "r", encoding="utf-8") as f:
                 content = f.read()
-                if "반도체 백과사전" in content:
+                if "series: 반도체 핵심 공정 백과사전" in content:
                     title_match = re.search(r'title:\s*"(.*?)"', content)
                     if title_match:
                         concepts.append(title_match.group(1))
-    return concepts[-10:] 
+    return concepts[-15:] 
 
 def generate_concept_wiki(previous_topics):
-    print("[1/3] 위키 문서 (시각화 기법 포함) 생성 중...")
+    print("[1/3] 구조적 위키 문서 생성 중...")
     api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY 누락")
-        
     client = OpenAI(api_key=api_key)
     prev_topics_str = "\n".join(previous_topics) if previous_topics else "기록 없음."
     
     system_prompt = """
     당신은 화학공학 전공 테크 위키 작성자입니다.
+    글을 읽는 독자가 나무위키나 노션(Notion)의 잘 정리된 기술 위키를 보는 것처럼 느끼도록 아주 체계적으로 구조화된 글을 쓰세요.
     
-    [시각화 및 딥다이브 규칙]
-    1. 사진(이미지) URL 삽입은 절대 금지합니다.
-    2. 기술의 이해를 돕기 위해 본문 중간중간 다양한 시각화 기법을 사용하세요.
-       - Mermaid 다이어그램: 플로우차트, 상태도 등을 사용해 반응 메커니즘이나 장비 구조를 시각화하세요. (`mermaid` 코드 블록 사용)
-       - 마크다운 표(Table): 파라미터 비교, 물질 특성 등을 표로 정리하세요.
-       - 단계별 리스트: 공정 순서를 넘버링(1, 2, 3)하여 체계적으로 설명하세요.
-    3. 수식은 LaTeX(백슬래시)를 절대 쓰지 말고, HTML 태그(<sub>, <sup>, &rarr;)만 사용하세요.
-    4. 위키답게 매우 구조적이고 정보량이 방대하게(최소 3000자 이상) 작성하세요.
+    [위키 템플릿 - 반드시 이 목차 구조를 따를 것]
+    ## 1. 개념 개요 (Overview)
+    ## 2. 핵심 작동 원리 (Mechanism) - 반드시 Mermaid 다이어그램 포함
+    ## 3. 공정 파라미터 및 주요 소재 (Materials & Variables) - 반드시 마크다운 표(Table) 포함
+    ## 4. 한계점 및 최신 기술 동향 (Trends & Challenges)
+
+    [규칙]
+    1. 사진(이미지) 삽입 절대 금지.
+    2. 수식은 LaTeX(백슬래시) 절대 금지. HTML 태그(<sub>, <sup>, &rarr;)만 사용.
+    3. 최소 3000자 이상의 매우 상세한 딥다이브 문서를 작성하세요.
     """
 
     user_prompt = f"""
-    반드시 아래 양식의 순수 텍스트로만 출력하세요. (JSON 포맷 절대 금지)
+    반드시 아래 양식의 순수 텍스트로만 출력하세요.
     
-    Title: [반도체 백과사전] (선정한 주제명)
+    Title: (주제명만 간결하게, 예: EUV 노광 공정의 화학적 메커니즘)
     Content:
-    [인용구 요약, 딥다이브 원리(Mermaid 다이어그램, 표 활용), 결론으로 구성된 마크다운 본문]
+    [제시된 위키 템플릿에 맞춘 마크다운 본문]
 
     이전 위키 주제 목록:
     {prev_topics_str}
@@ -62,7 +60,7 @@ def generate_concept_wiki(previous_topics):
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
-        temperature=0.5
+        temperature=0.4
     )
     
     full_text = response.choices[0].message.content
@@ -70,28 +68,28 @@ def generate_concept_wiki(previous_topics):
         title = re.search(r'Title:\s*(.*)', full_text, re.IGNORECASE).group(1).strip()
         content = re.search(r'Content:\s*(.*)', full_text, re.IGNORECASE | re.DOTALL).group(1).strip()
     except AttributeError:
-        title = f"[반도체 백과사전] {datetime.datetime.now().strftime('%m월 %d일')} 딥다이브"
+        title = f"{datetime.datetime.now().strftime('%m월 %d일')} 반도체 공정 딥다이브"
         content = full_text
         
     return title, content
 
 def save_to_markdown(title, content):
-    print("[2/3] 마크다운 파일 생성 중...")
+    print("[2/3] 마크다운 파일(시리즈 연동) 생성 중...")
     
     now = datetime.datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     safe_title = re.sub(r'[^가-힣A-Za-z0-9\s]', '', title).strip().replace(' ', '-')
     filename = f"_posts/{date_str}-wiki-{safe_title}.md"
-    if len(filename) > 100:
-        filename = f"_posts/{date_str}-wiki-semicon-concept.md"
     
     header_image = random.choice(HEADER_IMAGES)
     
+    # 💡 [핵심] series 태그를 추가하여 모든 위키 글이 하나의 네비게이션으로 묶이도록 설정
     front_matter = f"""---
-title: "{title}"
+title: "[기술위키] {title}"
 date: {now.strftime("%Y-%m-%d %H:%M:%S +0900")}
 categories: [반도체 백과사전, 공정기술]
-tags: [반도체사전, 화학공학, 공정엔지니어, 테크위키]
+tags: [반도체위키, 8대공정, 딥다이브]
+series: 반도체 핵심 공정 백과사전
 image:
   path: "{header_image}"
 math: true
@@ -103,14 +101,13 @@ mermaid: true
     with open(filename, "w", encoding="utf-8") as f:
         f.write(front_matter + content)
     
-    print(f"✅ 파일 생성 완료: {filename}")
+    print(f"✅ 위키 파일 생성 완료")
 
 def main():
-    print("=== 기술 백과사전 스크립트 시작 ===")
+    print("=== 위키 스크립트 시작 ===")
     prev_topics = get_previous_concepts()
     title, content = generate_concept_wiki(prev_topics)
     save_to_markdown(title, content)
-    print("=== 자동화 완료 ===")
 
 if __name__ == "__main__":
     main()
