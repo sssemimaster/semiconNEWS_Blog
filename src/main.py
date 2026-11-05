@@ -7,63 +7,57 @@ import requests
 from openai import OpenAI
 
 RSS_FEEDS = {
-    '공정기술': 'https://news.google.com/rss/search?q=반도체+공정+when:1d&hl=ko&gl=KR&ceid=KR:ko',
-    '소재화학': 'https://news.google.com/rss/search?q=반도체+소재+when:1d&hl=ko&gl=KR&ceid=KR:ko',
-    '노광식각': 'https://news.google.com/rss/search?q=EUV+OR+식각+when:1d&hl=ko&gl=KR&ceid=KR:ko'
+    '반도체이슈': 'https://news.google.com/rss/search?q=반도체+동향+OR+투자+OR+수율+when:1d&hl=ko&gl=KR&ceid=KR:ko',
+    '공정/소재': 'https://news.google.com/rss/search?q=반도체+공정+OR+소재+OR+EUV+when:1d&hl=ko&gl=KR&ceid=KR:ko'
 }
 
 HEADERS = {'User-Agent': 'Mozilla/5.0'}
 
-# 썸네일(헤더)용 이미지만 남김
 HEADER_IMAGES = [
     "https://images.unsplash.com/photo-1611078518653-568853b0bcce?auto=format&fit=crop&w=1200&h=675&q=80",
     "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1200&h=675&q=80",
-    "https://images.unsplash.com/photo-1563770660941-20978e870e26?auto=format&fit=crop&w=1200&h=675&q=80"
+    "https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1200&h=675&q=80"
 ]
 
 def collect_news():
     articles = []
-    print("[1/3] 뉴스 수집 중...")
+    print("[1/3] 최신 반도체 이슈 수집 중...")
     for source, url in RSS_FEEDS.items():
         try:
             res = requests.get(url, headers=HEADERS, timeout=5)
             res.raise_for_status()
             feed = feedparser.parse(res.content)
-            for entry in feed.entries[:6]: 
+            for entry in feed.entries[:8]: 
                 articles.append(f"[{source}] {getattr(entry, 'title', '')}")
         except:
             pass
     return articles
 
 def generate_blog_content(articles):
-    print("[2/3] 다이어그램 및 시각화 포함 롱폼 본문 생성 중...")
+    print("[2/3] 이슈 동향 및 기술 분석 리포트 생성 중...")
     api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY 누락")
-        
     client = OpenAI(api_key=api_key)
-    raw_text = "\n".join(articles[:20])
+    raw_text = "\n".join(articles)
     
     system_prompt = """
-    당신은 화학공학 전공 반도체 공정 엔지니어입니다.
-    
-    [시각화 및 가독성 극대화 규칙]
-    1. 사진(이미지) 삽입은 절대 금지합니다.
-    2. 글의 가독성을 높이기 위해 본문 중간에 반드시 아래의 시각화 기법을 적극 활용하세요.
-       - Mermaid 다이어그램: 공정 순서, 화학 반응 메커니즘 등을 `mermaid` 코드 블록으로 그리세요. (예: graph TD; A-->B;)
-       - 마크다운 표(Table): 소재 특성 비교, 장단점 등을 표로 깔끔하게 정리하세요.
-       - 인용구(Blockquote): 핵심 요약이나 인사이트는 `>` 를 활용해 눈에 띄게 강조하세요.
-    3. 수식은 LaTeX(백슬래시)를 절대 쓰지 말고, HTML 태그(<sub>, <sup>, &rarr;, &Delta;)만 사용하세요. (예: SiH<sub>4</sub> &rarr; Si + 2H<sub>2</sub>)
-    4. 글은 학부생과 주니어 엔지니어가 딥다이브할 수 있도록 아주 길고 상세하게(최소 3000자 이상) 작성하세요.
+    당신은 반도체 산업 트렌드를 꿰뚫고 있는 화학공학 전공 공정 엔지니어입니다.
+    오늘의 뉴스 기사를 분석하여, '시장 이슈 동향'과 '엔지니어 시선의 기술적 분석'이 결합된 전문 리포트를 작성하세요.
+
+    [가이드 및 포맷]
+    1. 사진 삽입 금지, 수식은 반드시 HTML(<sub>, <sup>, &rarr;)만 사용 (LaTeX 금지).
+    2. 블로그 홈에서 잘 보이도록 글의 서두에 인용구(`>`)로 핵심을 3줄 요약하세요.
+    3. 본문 구조는 다음을 따르세요:
+       - ## 📰 오늘의 반도체 핫이슈 (기사 바탕 동향 요약)
+       - ## 🔬 엔지니어의 시선: 기술 분석 (이슈에 얽힌 공정/소재 기술 원리를 Mermaid 다이어그램 등으로 시각화)
+       - ## 💡 시장 전망 및 시사점
     """
 
     user_prompt = f"""
-    반드시 아래 양식의 순수 텍스트로만 출력하세요. (JSON 포맷 절대 금지)
+    반드시 아래 양식의 순수 텍스트로만 출력하세요. (JSON 금지)
     
-    Title: [포스팅 제목]
+    Title: [일일브리핑] (오늘 가장 중요한 이슈를 포함한 매력적인 제목)
     Content:
-    [서론, 본론(다이어그램/표 포함), 결론으로 구성된 마크다운 본문]
+    [서론 요약, 본론, 결론으로 구성된 마크다운]
 
     수집된 기사:
     {raw_text}
@@ -72,37 +66,35 @@ def generate_blog_content(articles):
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
-        temperature=0.5
+        temperature=0.6
     )
     
     full_text = response.choices[0].message.content
-    
     try:
         title = re.search(r'Title:\s*(.*)', full_text, re.IGNORECASE).group(1).strip()
         content = re.search(r'Content:\s*(.*)', full_text, re.IGNORECASE | re.DOTALL).group(1).strip()
     except AttributeError:
-        title = f"{datetime.datetime.now().strftime('%Y년 %m월 %d일')} 반도체 공정 기술 동향"
+        title = f"[일일브리핑] {datetime.datetime.now().strftime('%m월 %d일')} 반도체 동향"
         content = full_text
         
     return title, content
 
 def save_to_markdown(title, content):
-    print("[3/3] 마크다운 파일 생성 중...")
+    print("[3/3] 파일 저장 중...")
     
     now = datetime.datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     safe_title = re.sub(r'[^가-힣A-Za-z0-9\s]', '', title).strip().replace(' ', '-')
     filename = f"_posts/{date_str}-{safe_title}.md"
-    if len(filename) > 100:
-        filename = f"_posts/{date_str}-daily-process-news.md"
     
     header_image = random.choice(HEADER_IMAGES)
     
+    # 카테고리를 명확히 '뉴스/동향'으로 분리
     front_matter = f"""---
 title: "{title}"
 date: {now.strftime("%Y-%m-%d %H:%M:%S +0900")}
-categories: [반도체 공정, 기술분석]
-tags: [화학공학, 8대공정, 공정엔지니어, 반도체뉴스]
+categories: [반도체 브리핑, 트렌드 동향]
+tags: [반도체이슈, 공정기술, 시장전망]
 image:
   path: "{header_image}"
 math: true
@@ -114,15 +106,14 @@ mermaid: true
     with open(filename, "w", encoding="utf-8") as f:
         f.write(front_matter + content)
     
-    print(f"✅ 파일 생성 완료: {filename}")
+    print(f"✅ 뉴스 파일 생성 완료")
 
 def main():
-    print("=== 뉴스 브리핑 스크립트 시작 ===")
+    print("=== 뉴스 브리핑 시작 ===")
     articles = collect_news()
-    if not articles: return
-    title, content = generate_blog_content(articles)
-    save_to_markdown(title, content)
-    print("=== 자동화 완료 ===")
+    if articles:
+        title, content = generate_blog_content(articles)
+        save_to_markdown(title, content)
 
 if __name__ == "__main__":
     main()
