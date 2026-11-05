@@ -41,23 +41,40 @@ def collect_news():
             pass
     return articles
 
+def inject_html_images(content, base_keyword):
+    """💡 본문 H2(##) 태그 아래에 이미지를 딱 2장만 삽입합니다."""
+    lines = content.split('\n')
+    new_lines = []
+    img_count = 0
+    sub_keywords = ["news", "industry"] 
+    
+    for line in lines:
+        new_lines.append(line)
+        if line.startswith('## ') and img_count < 2:
+            search_kw = f"{base_keyword} {sub_keywords[img_count]}"
+            img = get_dynamic_image(search_kw)
+            html_img = f'\n<img src="{img}" alt="트렌드 참고 자료" style="width:100%; border-radius:12px; margin: 20px 0;">\n'
+            new_lines.append(html_img)
+            img_count += 1
+    return '\n'.join(new_lines)
+
 def generate_blog_content(articles):
-    print("[2/4] STEP 1: 기사 분석 및 리포트 뼈대(Outline) 기획 중...")
+    print("[2/4] STEP 1: 기사 분석 및 3단 리포트 기획 중...")
     api_key = os.environ.get("OPENAI_API_KEY")
     client = OpenAI(api_key=api_key)
     raw_text = "\n".join(articles)
     
-    outline_system = "당신은 반도체 산업 트렌드와 기술을 분석하는 시니어 애널리스트/공정 엔지니어입니다."
+    outline_system = "당신은 반도체 산업 트렌드를 분석하는 시니어 애널리스트/엔지니어입니다."
     outline_user = f"""
-    아래 수집된 오늘자 기사들을 분석하여, 가장 핫한 이슈 1개를 메인 테마로 잡고 리포트 구조를 JSON으로 출력하세요.
+    아래 수집된 오늘자 기사들을 분석하여, 가장 핫한 이슈 1개를 잡고 JSON으로 출력하세요.
     
     {{
-        "title": "오늘의 핫이슈를 담은 매력적인 리포트 제목 (예: TSMC 2나노 수율 논란과 GAA 공정 한계)",
+        "title": "오늘의 핫이슈를 담은 매력적인 리포트 제목",
         "keyword": "썸네일용 영문 검색어 1개 (예: silicon wafer)",
         "outline": [
-            "1. 📰 오늘의 핫이슈 (뉴스 요약 및 배경)",
-            "2. 🔬 엔지니어의 시선: 기술 분석 (공정/소재 원리 딥다이브)",
-            "3. 💡 향후 전망 및 시사점 (시장 파급력)"
+            "1. 📰 오늘의 핫이슈 (뉴스 요약)",
+            "2. 🔬 엔지니어의 시선: 기술 분석 (공정 원리 딥다이브)",
+            "3. 💡 시장 전망 및 시사점"
         ]
     }}
     
@@ -77,25 +94,26 @@ def generate_blog_content(articles):
     keyword = plan["keyword"]
     sections = plan["outline"]
     
-    print(f"[3/4] STEP 2: 문맥 이어달리기(Context Chaining) 방식으로 본문 심층 작성 중...")
+    print(f"[3/4] STEP 2: 문맥 이어달리기 방식으로 본문 심층 작성 중...")
     full_content = ""
     
+    # 💡 '결론병' 치료용 금지어 세팅
     writer_system = """
     당신은 화학공학 전공 반도체 공정 엔지니어입니다.
     [규칙]
-    1. 수식은 LaTeX 금지, HTML 태그(<sub>, <sup>, &rarr;)만 사용.
-    2. 내용 설명 중 적절한 곳에 마크다운 표(Table) 또는 Mermaid 다이어그램을 활용하세요.
-    3. 사진(이미지) 삽입은 절대 금지합니다.
+    1. 수식은 HTML 태그(<sub>, <sup>, &rarr;)만 사용.
+    2. 마크다운 표(Table) 또는 Mermaid 다이어그램 활용.
+    3. 사진 삽입 절대 금지.
+    4. 🚨 절대 금지어: '결론적으로', '요약하자면', '종합하면'. 이 단어들은 절대 쓰지 마세요.
     """
 
     for i, section_title in enumerate(sections):
-        # 💡 [핵심] 섹션 위치에 따른 역할 부여 (결론 남발 방지)
         if i == 0:
-            role_guide = "이 부분은 리포트의 '서론'입니다. 이슈의 배경과 현황을 몰입감 있게 설명하세요. 절대 결론이나 요약을 내지 마세요."
+            role_guide = "리포트의 '서론'입니다. 절대 결론을 내리지 마세요."
         elif i == len(sections) - 1:
-            role_guide = "이 부분은 리포트의 '결론'입니다. 앞선 기술 분석을 바탕으로 시장의 전망과 인사이트를 종합하세요."
+            role_guide = "리포트의 '결론'입니다. 굳이 요약하지 말고 앞으로의 전망만 제시하세요."
         else:
-            role_guide = "이 부분은 리포트의 '본론(딥다이브)'입니다. 서론이나 결론을 억지로 적지 마세요. '결론적으로', '요약하자면' 같은 표현은 엄격히 금지됩니다. 오직 기술적 팩트와 원리만 깊게 파고드세요."
+            role_guide = "리포트의 '본론(딥다이브)'입니다. 서론/결론 없이 기술적 팩트만 서술하세요."
 
         writer_user = f"""
         전체 리포트 주제: {title}
@@ -105,7 +123,7 @@ def generate_blog_content(articles):
         [지금까지 작성된 앞부분 내용]
         {full_content if full_content else "없음 (이제 시작함)"}
         
-        위 앞부분 내용과 물 흐르듯 자연스럽게 이어지도록, 현재 섹션(## {section_title})에 해당하는 본문만 아주 길고 전문적으로 작성하세요.
+        위 앞부분 내용과 자연스럽게 이어지도록, 현재 섹션에 해당하는 본문만 작성하세요.
         """
         
         res_section = client.chat.completions.create(
@@ -120,8 +138,12 @@ def generate_blog_content(articles):
     return title, keyword, full_content
 
 def save_to_markdown(title, keyword, content):
-    print(f"[4/4] 썸네일({keyword}) 적용 및 파일 생성 중...")
+    print(f"[4/4] 썸네일 및 본문 이미지 주입 중...")
     content = content.replace('\\', '\\\\')
+    
+    # 💡 본문에 이미지 2개 삽입
+    content = inject_html_images(content, keyword)
+    
     now = datetime.datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     safe_title = re.sub(r'[^가-힣A-Za-z0-9\s]', '', title).strip().replace(' ', '-')
