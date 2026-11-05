@@ -41,22 +41,6 @@ def collect_news():
             pass
     return articles
 
-def inject_html_images(content, base_keyword):
-    """💡 본문 H2(##) 태그 아래에 이미지를 딱 1장만 삽입합니다."""
-    lines = content.split('\n')
-    new_lines = []
-    img_count = 0
-    
-    for line in lines:
-        new_lines.append(line)
-        if line.startswith('## ') and img_count < 1:
-            search_kw = f"{base_keyword} industry"
-            img = get_dynamic_image(search_kw)
-            html_img = f'\n<img src="{img}" alt="트렌드 참고 자료" style="width:100%; border-radius:12px; margin: 20px 0;">\n'
-            new_lines.append(html_img)
-            img_count += 1
-    return '\n'.join(new_lines)
-
 def generate_blog_content(articles):
     print("[2/4] STEP 1: 기사 분석 및 3단 리포트 기획 중...")
     api_key = os.environ.get("OPENAI_API_KEY")
@@ -99,8 +83,8 @@ def generate_blog_content(articles):
     writer_system = """
     당신은 화학공학 전공 반도체 공정 엔지니어입니다.
     [규칙]
-    1. 수식은 HTML 태그(<sub>, <sup>, &rarr;)만 사용.
-    2. 마크다운 표(Table) 또는 Mermaid 다이어그램 활용.
+    1. 수식은 HTML 태그(<sub>, <sup>, &rarr;)만 사용. (LaTeX 금지)
+    2. 마크다운 표(Table) 또는 Mermaid 다이어그램 적극 활용.
     3. 사진 삽입 절대 금지.
     4. 🚨 절대 금지어: '결론적으로', '요약하자면', '종합하면'. 이 단어들은 절대 쓰지 마세요.
     """
@@ -136,10 +120,8 @@ def generate_blog_content(articles):
     return title, keyword, full_content
 
 def save_to_markdown(title, keyword, content):
-    print(f"[4/4] 썸네일 및 본문 이미지 주입 중...")
+    print(f"[4/4] 메인 썸네일 적용 및 파일 생성 중...")
     content = content.replace('\\', '\\\\')
-    
-    content = inject_html_images(content, keyword)
     
     now = datetime.datetime.now()
     date_str = now.strftime("%Y-%m-%d")
