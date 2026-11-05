@@ -37,17 +37,15 @@ def get_previous_concepts():
     return list(concepts)
 
 def inject_html_images(content, base_keyword):
-    """💡 본문 H2(##) 태그 아래에 이미지를 딱 2장만 삽입합니다."""
+    """💡 본문 H2(##) 태그 아래에 이미지를 딱 1장만 삽입합니다."""
     lines = content.split('\n')
     new_lines = []
     img_count = 0
-    # 본문 이미지들이 똑같지 않게 검색어에 약간의 변형을 줍니다.
-    sub_keywords = ["technology", "process engineering"] 
     
     for line in lines:
         new_lines.append(line)
-        if line.startswith('## ') and img_count < 2:
-            search_kw = f"{base_keyword} {sub_keywords[img_count]}"
+        if line.startswith('## ') and img_count < 1:
+            search_kw = f"{base_keyword} process engineering"
             img = get_dynamic_image(search_kw)
             html_img = f'\n<img src="{img}" alt="공정 시각화 자료" style="width:100%; border-radius:12px; margin: 20px 0;">\n'
             new_lines.append(html_img)
@@ -95,7 +93,6 @@ def generate_concept_wiki(previous_topics):
     print(f"[2/4] STEP 2: '{clean_title}' 3단 분할 작성 시작...")
     full_content = ""
     
-    # 💡 [핵심] '결론병'을 치료하기 위한 강력한 금지어 설정
     writer_system = """
     당신은 화학공학 전공 시니어 반도체 공정 엔지니어입니다.
     [규칙]
@@ -138,10 +135,9 @@ def generate_concept_wiki(previous_topics):
     return final_title, keyword, full_content
 
 def save_to_markdown(title, keyword, content):
-    print(f"[3/4] 썸네일 및 본문 이미지 2장 주입 중...")
+    print(f"[3/4] 썸네일 및 본문 이미지 1장 주입 중...")
     content = content.replace('\\', '\\\\')
     
-    # 💡 본문에 이미지 2개 삽입
     content = inject_html_images(content, keyword)
     
     now = datetime.datetime.now()
